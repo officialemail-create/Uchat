@@ -88,6 +88,7 @@ export type DmsResponse = {
 
 import React from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { apiUrl } from '@/lib/api-url'
 
 const buildHeaders = (token?: string | null) => ({
   'Content-Type': 'application/json',
@@ -106,7 +107,7 @@ const requestJson = async <T,>(path: string, options?: RequestInit): Promise<T> 
     ...(currentUsername ? { 'x-username': currentUsername } : {}),
     ...(options?.headers ?? {}),
   };
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(apiUrl(path), {
     credentials: 'include',
     headers,
     ...options,

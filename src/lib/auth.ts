@@ -1,4 +1,4 @@
-const BASE = "/api";
+import { apiUrl } from './api-url';
 
 export interface AuthUser {
   id: string;
@@ -76,7 +76,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, {
+    res = await fetch(apiUrl(path), {
       credentials: "include",
       headers,
       ...options,

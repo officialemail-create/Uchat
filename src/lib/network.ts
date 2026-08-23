@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { apiUrl } from './api-url';
 
 export type NetworkQuality = 'excellent' | 'good' | 'weak' | 'poor';
 
@@ -14,7 +15,7 @@ export function useNetworkQuality() {
       if (!activeRef.current) return;
       try {
         const start = performance.now();
-        await fetch('/api/healthz', { method: 'GET', cache: 'no-store' });
+        await fetch(apiUrl('/healthz'), { method: 'GET', cache: 'no-store' });
         const ms = Math.round(performance.now() - start);
         if (!activeRef.current) return;
         setLatency(ms);
