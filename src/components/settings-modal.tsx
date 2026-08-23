@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { apiUrl } from "@/lib/api-url";
 import type { RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -169,7 +170,7 @@ function SettingsAccountCard({ onClose, sectionRef }: { onClose: () => void; sec
     setUploading(true);
     setUploadError(null);
     try {
-      const res = await fetch("/api/storage/uploads/request-url", {
+      const res = await fetch(apiUrl("/storage/uploads/request-url"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),

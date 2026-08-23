@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { apiUrl } from '@/lib/api-url';
 
 export interface UploadedAttachment {
   objectPath: string;
@@ -41,7 +42,7 @@ export function useFileUpload() {
       const formData = new FormData();
       formData.append("file", file, file.name);
 
-      const res = await fetch("/api/uploads", {
+      const res = await fetch(apiUrl("/uploads"), {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: formData,

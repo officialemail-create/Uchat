@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "@/components/emoji-picker";
+import { apiUrl } from "@/lib/api-url";
 
 export type RoomDetail = {
   id: string;
@@ -76,7 +77,7 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(apiUrl(path), {
       credentials: "include",
       headers,
       ...options,
@@ -114,7 +115,7 @@ async function uploadFiles(files: File[]) {
 
     let uploadRes: Response;
     try {
-      uploadRes = await fetch("/api/uploads", {
+      uploadRes = await fetch(apiUrl("/uploads"), {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: formData,
@@ -588,7 +589,7 @@ export default function RoomPage() {
       const token = typeof window !== "undefined" ? window.localStorage.getItem("uchat_session_token") : null;
       const formData = new FormData();
       formData.append("file", payload.file, payload.file.name);
-      const uploadRes = await fetch("/api/uploads", {
+      const uploadRes = await fetch(apiUrl("/uploads"), {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: formData,

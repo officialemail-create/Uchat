@@ -14,6 +14,7 @@ import { ArrowDown, RefreshCw, Trash2, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import { requestNotificationPermission, showNotification, playNotificationSound } from "@/lib/notify";
+import { apiUrl } from "@/lib/api-url";
 
 const BG = "#0B0F19";
 const ACCENT = "#8B5CF6";
@@ -282,7 +283,7 @@ export default function Chat() {
     try {
       const oldest = realMessages[0].timestamp;
       const ts = new Date(oldest as unknown as string).toISOString();
-      const res = await fetch(`/api/messages?limit=50&before=${encodeURIComponent(ts)}`);
+      const res = await fetch(apiUrl(`/messages?limit=50&before=${encodeURIComponent(ts)}`));
       const data: { messages: Message[]; hasMore: boolean } = await res.json();
       if (data.messages?.length) {
         useChatStore.getState().prependMessages([...data.messages].reverse());

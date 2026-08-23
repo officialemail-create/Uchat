@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useGetPrivateChats, sendFriendRequest, type Chat, type SearchUser } from "@workspace/api-client-react";
 import { SkeletonRows } from "@/components/skeletons";
 import { useDebounce } from "@/hooks/use-debounce";
+import { apiUrl } from "@/lib/api-url";
 
 function highlightMatch(text: string, query: string) {
   if (!query) return <>{text}</>;
@@ -109,7 +110,7 @@ export default function UserSearchModal({ open, onClose }: { open: boolean; onCl
           ...(username ? { 'x-username': username } : {}),
         };
 
-        const response = await fetch(`/api/users/search?q=${encodeURIComponent(trimmed)}`, {
+        const response = await fetch(apiUrl(`/users/search?q=${encodeURIComponent(trimmed)}`), {
           method: 'GET',
           headers,
           credentials: 'include',

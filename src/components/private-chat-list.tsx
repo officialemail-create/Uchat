@@ -17,6 +17,7 @@ import { useAuthStore } from "@/store/authStore";
 import { SkeletonRows } from "@/components/skeletons";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { resolveAvatarUrl } from "@/lib/auth";
+import { apiUrl } from "@/lib/api-url";
 
 function highlightMatch(text: string, query: string) {
   if (!query) return <>{text}</>;
@@ -304,7 +305,7 @@ export function PrivateChatList({ conversations, conversationsLoading = false, o
           ...(username ? { 'x-username': username } : {}),
         };
 
-        const response = await fetch(`/api/users/search?q=${encodeURIComponent(currentQuery)}`, {
+        const response = await fetch(apiUrl(`/users/search?q=${encodeURIComponent(currentQuery)}`), {
           method: 'GET',
           headers,
           credentials: 'include',

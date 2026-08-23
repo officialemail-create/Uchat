@@ -14,6 +14,7 @@ import type { UserSearchResult } from "@/components/private-chat-list";
 import { updateLastSeen } from "@/hooks/useSupabaseRealtime";
 import { normalizeDmMessage, useDmStore } from "@/store/dmStore";
 import type { DmMessage } from "@/store/dmStore";
+import { apiUrl } from "@/lib/api-url";
 
 type PrivateConversation = {
   id: string;
@@ -216,7 +217,7 @@ export default function PrivateChatsPage() {
             .slice(-1)[0];
           const lastSyncedAt = lastMessage?.timestamp ?? new Date(0).toISOString();
           try {
-            const syncResponse = await fetch(`/api/messages/sync?chat_id=${encodeURIComponent(selectedConversationId)}&last_synced_at=${encodeURIComponent(lastSyncedAt)}`, {
+            const syncResponse = await fetch(apiUrl(`/messages/sync?chat_id=${encodeURIComponent(selectedConversationId)}&last_synced_at=${encodeURIComponent(lastSyncedAt)}`), {
               headers: token ? { Authorization: `Bearer ${token}` } : {},
             });
             if (syncResponse.ok) {
@@ -289,7 +290,7 @@ export default function PrivateChatsPage() {
     if (!chatId) {
       try {
           const token = getSessionToken();
-          const res = await fetch('/api/private-chats', {
+          const res = await fetch(apiUrl('/private-chats'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-username': currentUsername ?? '', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: JSON.stringify({ otherUsername: user.username }),
@@ -452,7 +453,7 @@ export default function PrivateChatsPage() {
 
     try {
       const token = getSessionToken();
-      const res = await fetch(`/api/private-chats/${encodeURIComponent(chatId)}/messages`, {
+          const res = await fetch(apiUrl(`/private-chats/${encodeURIComponent(chatId)}/messages`), {
         headers: { 'x-username': currentUsername ?? '', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         signal: controller.signal,
       });
@@ -461,7 +462,7 @@ export default function PrivateChatsPage() {
         const refreshed = await authApi.me();
         authStore.getState().setUser(refreshed);
         const token2 = getSessionToken();
-        const retry = await fetch(`/api/private-chats/${encodeURIComponent(chatId)}/messages`, {
+            const retry = await fetch(apiUrl(`/private-chats/${encodeURIComponent(chatId)}/messages`), {
           headers: { 'x-username': refreshed.username ?? '', ...(token2 ? { Authorization: `Bearer ${token2}` } : {}) },
           signal: controller.signal,
         });

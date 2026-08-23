@@ -122,7 +122,11 @@ function AppContent() {
       return;
     }
 
-    authApi.me()
+    const timeout = new Promise<never>((_, reject) => {
+      window.setTimeout(() => reject(new Error('Authentication request timed out')), 10000);
+    });
+
+    Promise.race([authApi.me(), timeout])
       .then((user) => {
         setUser(user);
         setCurrentUsername(user.username);
