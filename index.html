@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Uchat</title>
+    <meta name="description" content="Uchat." />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="Uchat" />
+    <meta property="og:description" content="Uchat." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Uchat" />
+    <meta name="twitter:description" content="Uchat." />
+    <link rel="icon" href="/logo.ico" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root">
+      <div class="preact-splash" role="status" aria-label="Loading Uchat">
+        <img src="/logo.ico" alt="Uchat" />
+        <span>Uchat</span>
+      </div>
+    </div>
+    <style>
+      html, body, #root { min-height: 100%; margin: 0; background: #0f172a; }
+      .preact-splash { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: #0f172a; color: #fff; font: 600 20px/1.2 Inter, sans-serif; letter-spacing: .18em; }
+      .preact-splash img { width: clamp(96px, 22vw, 128px); height: clamp(96px, 22vw, 128px); object-fit: contain; border-radius: 22%; }
+    </style>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(error => {
+            console.error('ServiceWorker registration failed:', error);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

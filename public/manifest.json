@@ -1,0 +1,16 @@
+{
+  "name": "Uchat",
+  "short_name": "Uchat",
+  "description": "Global community chat platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F19",
+  "theme_color": "#8B5CF6",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
