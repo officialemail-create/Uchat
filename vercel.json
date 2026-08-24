@@ -5,5 +5,16 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/((?!assets/|favicon.svg|logo.ico|manifest.json|sw.js).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, public, max-age=0, must-revalidate"
+        }
+      ]
+    }
   ]
 }

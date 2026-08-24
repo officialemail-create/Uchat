@@ -100,6 +100,8 @@ function AppContent() {
 
   useEffect(() => {
     if (!isLoading) setIsAppReady(true);
+    const fallback = window.setTimeout(() => setIsAppReady(true), 3000);
+    return () => window.clearTimeout(fallback);
   }, [isLoading]);
 
   useEffect(() => {
