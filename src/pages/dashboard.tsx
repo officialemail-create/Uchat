@@ -51,24 +51,24 @@ export default function DashboardPage() {
 
               <div className="mt-6 flex flex-col gap-3">
                 <button
-                  onClick={() => setCreateRoomOpen(true)}
-                  className="flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors duration-150"
+                  disabled
+                  className="flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold opacity-50"
                   style={{ borderColor: themeStyles.border, background: themeStyles.panelSoft, color: themeStyles.textSoft }}
                 >
                   <PlusCircle className="h-4 w-4" />
                   Create Global Room
                 </button>
                 <button
-                  onClick={() => setLocation("/rooms/discover")}
-                  className="flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors duration-150"
+                  disabled
+                  className="flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold opacity-50"
                   style={{ borderColor: themeStyles.border, background: themeStyles.panelSoft, color: themeStyles.textSoft }}
                 >
                   <Compass className="h-4 w-4" />
                   Discover & Join Rooms
                 </button>
                 <button
-                  onClick={() => setLocation("/rooms/join")}
-                  className="flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors duration-150"
+                  disabled
+                  className="flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold opacity-50"
                   style={{ borderColor: themeStyles.border, background: themeStyles.panelSoft, color: themeStyles.textSoft }}
                 >
                   <ShieldCheck className="h-4 w-4" />
