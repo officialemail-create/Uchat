@@ -79,6 +79,10 @@ export default function Register() {
         password,
         confirmPassword,
       });
+      if (result.verificationRequired === false) {
+        setLocation("/login");
+        return;
+      }
       setVerificationLink(result.verificationLink ?? null);
       setDone(true);
     } catch (err: unknown) {

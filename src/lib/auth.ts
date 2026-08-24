@@ -121,6 +121,7 @@ export interface RegisterResponse {
   message: string;
   userId: string;
   verificationLink?: string;
+  verificationRequired?: boolean;
 }
 
 export function resolveAvatarUrl(value: string | null | undefined): string | null {
