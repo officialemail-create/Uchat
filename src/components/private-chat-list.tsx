@@ -111,7 +111,7 @@ const ChatListItemRow = memo(function ChatListItemRow({ conversation, onSelectCo
     >
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-transparent transition-all hover:border-purple-500">
         <UserAvatar src={avatarUrl} alt={conversation.displayName} size="lg" className="h-full w-full" />
-        {conversation.showOnlineStatus !== false && conversation.online ? <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500 dark:border-gray-800" /> : null}
+        {conversation.showOnlineStatus !== false && conversation.online ? <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-purple-500 dark:border-gray-800" /> : null}
       </div>
 
       <div className="min-w-0 flex-1">

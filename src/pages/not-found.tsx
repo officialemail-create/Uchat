@@ -16,7 +16,7 @@ export default function NotFound() {
       <button
         onClick={() => setLocation("/")}
         className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
-        style={{ background: "#22C55E", boxShadow: "0 0 20px rgba(34,197,94,0.3)" }}
+        style={{ background: "#8B5CF6", boxShadow: "0 0 20px rgba(139,92,246,0.3)" }}
       >
         Go home
       </button>

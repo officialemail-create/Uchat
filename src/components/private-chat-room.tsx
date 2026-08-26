@@ -1,7 +1,7 @@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ArrowLeft, Check, CheckCheck, Clock3, Lock, MoreVertical, RotateCw } from "lucide-react";
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { resolveAvatarUrl } from "@/lib/auth";
+import { authApi, resolveAvatarUrl } from "@/lib/auth";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAuthStore } from "@/store/authStore";
 import { Virtuoso } from "react-virtuoso";
@@ -148,7 +148,7 @@ const MessageBubble = memo(function MessageBubble({
 
           {message.kind === "voice" && message.attachmentUrl ? (
             <div className="w-full">
-              <VoiceMessageBubble src={message.attachmentUrl} duration={message.content ? undefined : undefined} isMine={isMine} className={isMine ? "border-purple-300/70 bg-purple-600/15" : "border-purple-200 bg-purple-50/80 dark:border-purple-700 dark:bg-purple-950/20"} />
+              <VoiceMessageBubble src={message.attachmentUrl} duration={message.voiceDuration} isMine={isMine} className={isMine ? "border-purple-300/70 bg-purple-600/15" : "border-purple-200 bg-purple-50/80 dark:border-purple-700 dark:bg-purple-950/20"} />
             </div>
           ) : null}
           <div className="mt-2 flex items-center justify-between gap-3">
@@ -411,9 +411,23 @@ export function PrivateChatRoom({ conversation, messages, messagesLoading = fals
     await handleUpload(file);
   };
 
-  const handleVoiceSend = async (audioDataUrl: string, durationMs: number) => {
-    const content = `Voice note · ${Math.max(1, Math.round(durationMs / 1000))}s`;
-    await onSendMessage(content);
+  const handleVoiceSend = async (audioBlob: Blob, durationMs: number, mimeType: string) => {
+    if (!conversation?.id) return;
+    try {
+      const uploaded = await authApi.uploadVoiceNote(audioBlob, mimeType);
+      const socket = await socketService.ensureAuthenticated();
+      if (!socket) throw new Error("Socket authentication failed");
+      socket.emit("send_voice_note", {
+        room: conversation.id,
+        audioUrl: uploaded.audioUrl,
+        duration: durationMs,
+        mimeType,
+        size: audioBlob.size,
+        clientMessageId: crypto.randomUUID(),
+      });
+    } catch (error) {
+      toast({ title: "Voice note failed", description: error instanceof Error ? error.message : "Unable to send voice note", variant: "destructive" });
+    }
   };
 
   const handleResend = async (message: PrivateMessageItem) => {

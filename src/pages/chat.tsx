@@ -177,9 +177,16 @@ export default function Chat() {
 
     requestNotificationPermission();
     const socket = socketService.connect();
-    const doJoin = () => socket.emit("join", { username: savedUsername });
+    let cancelled = false;
+    let joining = false;
+    const doJoin = async () => {
+      if (cancelled || joining) return;
+      joining = true;
+      await socketService.joinRoom("global");
+      joining = false;
+    };
 
-    socket.on("connect", () => { setIsConnected(true); doJoin(); });
+    socket.on("connect", () => { setIsConnected(true); void doJoin(); });
     socket.on("disconnect", () => { setIsConnected(false); clearPendingMessages(); });
 
     socket.on("join_error", ({ error }: { error: string }) => {
@@ -190,9 +197,9 @@ export default function Chat() {
       setLocation("/");
     });
 
-    const handleIncomingMessage = (msg: Message & { _pendingKey?: string }) => {
-      if (msg._pendingKey) {
-        const pendingId = `pending-${msg._pendingKey}`;
+    const handleIncomingMessage = (msg: Message & { _pendingKey?: string; clientMessageId?: string }) => {
+      if (msg._pendingKey || msg.clientMessageId) {
+        const pendingId = `pending-${msg._pendingKey ?? msg.clientMessageId}`;
         const state = useChatStore.getState();
         if (state.pendingIds.has(pendingId)) {
           state.replacePendingMessage(pendingId, msg);
@@ -226,9 +233,10 @@ export default function Chat() {
     socket.on("online_count", (count: number) => setOnlineCount(count));
     socket.on("room_typing_update", (payload: { roomId: string | null; users: string[] }) => setTypingUsers(payload?.users ?? []));
 
-    if (socket.connected) doJoin();
+    void socketService.ensureAuthenticated().then(() => doJoin());
 
     return () => {
+      cancelled = true;
       ["connect","disconnect","join_error","message_received","new_message","message_edited","message_unsent",
         "message_reaction","online_users","system_message","online_count","room_typing_update",
       ].forEach((ev) => socket.off(ev));

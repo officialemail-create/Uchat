@@ -129,9 +129,8 @@ export default function UploadModal({ onClose, onFilesSelected }: UploadModalPro
               </button>
             </div>
           </div>
-        ) : (
-          <div className="text-xs text-muted">No file selected</div>
-        )}
+        ) :
+          <div className="mt-3 text-sm text-muted">No file selected</div>}
       </div>
     </div>
   );

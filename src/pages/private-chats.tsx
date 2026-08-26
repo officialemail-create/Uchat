@@ -4,12 +4,13 @@ import { PrivateChatRoom } from "@/components/private-chat-room";
 import { Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { socketService } from "@/services/socket";
 import { authApi, clearSessionState, getSessionToken } from "@/lib/auth";
 import { useAuthStore as authStore } from "@/store/authStore";
 import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/hooks/use-toast";
-import { useGetPrivateChats } from "@workspace/api-client-react";
+import { useGetPrivateChats, getGetPrivateChatsQueryKey, type DmsResponse } from "@workspace/api-client-react";
 import type { UserSearchResult } from "@/components/private-chat-list";
 import { updateLastSeen } from "@/hooks/useSupabaseRealtime";
 import { normalizeDmMessage, useDmStore } from "@/store/dmStore";
@@ -68,6 +69,7 @@ export default function PrivateChatsPage() {
   const [match, params] = useRoute('/messages/:chatId');
   const [, setLocation] = useLocation();
   const { data: privateChatsData, isLoading: conversationsLoading } = useGetPrivateChats();
+  const queryClient = useQueryClient();
   const currentUsername = user?.username ?? null;
   const currentDisplayName = user?.displayName ?? user?.username ?? '';
 
@@ -131,6 +133,54 @@ export default function PrivateChatsPage() {
       setSelectedConversationId(normalizedChats[0].id);
     }
   }, [privateChatsData, params?.chatId, selectedConversationId]);
+
+  useEffect(() => {
+    const socket = socketService.connect();
+    const onUserProfileUpdated = (profile: { id?: string; username?: string; displayName?: string; profilePicture?: string | null; profile_picture?: string | null; avatarUrl?: string | null; avatar_url?: string | null }) => {
+      if (!profile?.id && !profile?.username) return;
+      const hasProfilePicture = Object.prototype.hasOwnProperty.call(profile, 'profilePicture')
+        || Object.prototype.hasOwnProperty.call(profile, 'profile_picture')
+        || Object.prototype.hasOwnProperty.call(profile, 'avatarUrl')
+        || Object.prototype.hasOwnProperty.call(profile, 'avatar_url');
+      const nextProfilePicture = profile.profilePicture ?? profile.profile_picture ?? profile.avatarUrl ?? profile.avatar_url ?? null;
+      setConversations((previous) => previous.map((conversation) => (
+        conversation.otherUserId === profile.id || conversation.username === profile.username
+          ? {
+              ...conversation,
+              displayName: profile.displayName ?? conversation.displayName,
+              username: profile.username ?? conversation.username,
+              profilePicture: hasProfilePicture ? nextProfilePicture : conversation.profilePicture,
+            }
+          : conversation
+      )));
+
+      queryClient.setQueryData<DmsResponse>(getGetPrivateChatsQueryKey(), (current: DmsResponse | undefined) => {
+        if (!current?.chats) return current;
+        return {
+          ...current,
+          chats: current.chats.map((chat: DmsResponse["chats"][number]) => (
+            chat.otherUser.id === profile.id || chat.otherUser.username === profile.username
+              ? {
+                  ...chat,
+                  otherUser: {
+                    ...chat.otherUser,
+                    displayName: profile.displayName ?? chat.otherUser.displayName,
+                    username: profile.username ?? chat.otherUser.username,
+                    ...(hasProfilePicture ? { profilePicture: nextProfilePicture } : {}),
+                  },
+                }
+              : chat
+          )),
+        };
+      });
+      void queryClient.invalidateQueries({ queryKey: getGetPrivateChatsQueryKey() });
+    };
+
+    socket.on('user_profile_updated', onUserProfileUpdated);
+    return () => {
+      socket.off('user_profile_updated', onUserProfileUpdated);
+    };
+  }, [queryClient]);
 
   useEffect(() => {
     if (!selectedConversationId || !currentUsername) return;

@@ -8,6 +8,8 @@ export type Message = {
   unsent?: boolean
   voiceNote?: boolean
   voiceDuration?: number | null
+  audioUrl?: string | null
+  clientMessageId?: string
   replyTo?: string | null
   replyToMessage?: string | null
   replyToSender?: string | null
@@ -97,7 +99,7 @@ const buildHeaders = (token?: string | null) => ({
 
 const requestJson = async <T,>(path: string, options?: RequestInit): Promise<T> => {
   const token = typeof window !== 'undefined'
-    ? await (await import('@/lib/supabase')).getSupabaseAuthToken()
+    ? localStorage.getItem('uchat_session_token') ?? localStorage.getItem('supabase_access_token') ?? await (await import('@/lib/supabase')).getSupabaseAuthToken()
     : null;
   const currentUsername = typeof window !== 'undefined'
     ? localStorage.getItem('uchat_username') ?? sessionStorage.getItem('uchat_username') ?? ''
@@ -119,11 +121,17 @@ const requestJson = async <T,>(path: string, options?: RequestInit): Promise<T> 
   return json as T
 }
 
-export const useGetMessages = (_opts?: any) =>
-  React.useMemo(() => ({ data: { messages: [] as Message[], hasMore: false }, isLoading: false }), [])
+export const useGetMessages = (opts?: { limit?: number }) =>
+  useQuery({
+    queryKey: ['messages', opts?.limit ?? 100],
+    queryFn: () => requestJson<{ messages: Message[]; hasMore: boolean }>(`/messages?limit=${opts?.limit ?? 100}`),
+  })
 
-export const useGetMessageStats = (_opts?: any) =>
-  React.useMemo(() => ({ data: { onlineCount: 0, totalMessages: 0, activeRooms: 0 } as MessageStats, isLoading: false }), [])
+export const useGetMessageStats = () =>
+  useQuery({
+    queryKey: ['messages', 'stats'],
+    queryFn: () => requestJson<MessageStats>('/messages/stats'),
+  })
 
 export const useCreateRoom = () => {
   return useMutation({

@@ -82,8 +82,8 @@ const VoicePlayer = memo(function VoicePlayer({ src, duration, isOwn, dataSaverM
   const progress = totalDuration > 0 ? currentTime / totalDuration : 0;
   const playedCount = Math.floor(progress * bars.length);
 
-  /* Own: bright white for played, dim for unplayed. Others: accent green */
-  const playedColor = isOwn ? "rgba(255,255,255,0.9)" : "#22C55E";
+  /* Own: bright white for played, dim for unplayed. Others: purple accent */
+  const playedColor = isOwn ? "rgba(255,255,255,0.9)" : "#8B5CF6";
   const unplayedColor = isOwn ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.18)";
 
   return (

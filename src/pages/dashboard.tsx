@@ -44,8 +44,8 @@ export default function DashboardPage() {
                   <Users className="h-5 w-5" />
                 </div>
                 <div> 
-                  <h2 className="text-lg font-semibold" style={{ color: themeStyles.text }}>Global Chats</h2>
-                  <p className="text-sm" style={{ color: themeStyles.textMuted }}>Create a room or join.(coming soon) </p>
+                  <h2 className="text-lg font-semibold" style={{ color: themeStyles.text }}>Global Chats. (coming soon)</h2>
+                  <p className="text-sm" style={{ color: themeStyles.textMuted }}>Create a room or join.</p>
                 </div>
               </div>
 

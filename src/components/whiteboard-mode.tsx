@@ -49,7 +49,7 @@ type WhiteboardModeProps = {
   onContentChange?: (content: string) => void;
 };
 
-const DEFAULT_COLORS = ["#7C3AED", "#111827", "#DC2626", "#2563EB", "#16A34A"];
+const DEFAULT_COLORS = ["#7C3AED", "#111827", "#DC2626", "#2563EB", "#8B5CF6"];
 const DEFAULT_STAGE = { x: 0, y: 0, scale: 1 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);

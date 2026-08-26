@@ -25,21 +25,21 @@ export function formatLastSeen(
     return null;
   }
 
-  if (!timestamp) return otherUserHidden ? 'Active recently' : 'Active recently';
+  if (!timestamp) return 'Offline';
 
   const date = toDate(timestamp);
-  if (!date) return 'Active recently';
+  if (!date) return 'Offline';
 
-  if (otherUserHidden) return 'Active recently';
+  if (otherUserHidden) return 'Last seen recently';
 
   const diffMs = Date.now() - date.getTime();
-  if (diffMs <= 60_000) return 'Active now';
-  if (diffMs < 60 * 60_000) return `Active ${Math.max(1, Math.round(diffMs / 60_000))}m ago`;
-  if (diffMs < 24 * 60 * 60_000) return `Active ${Math.max(1, Math.round(diffMs / (60 * 60_000)))}h ago`;
+  if (diffMs <= 60_000) return 'Just now';
+  if (diffMs < 60 * 60_000) return `${Math.max(1, Math.round(diffMs / 60_000))}m ago`;
+  if (diffMs < 24 * 60 * 60_000) return `${Math.max(1, Math.round(diffMs / (60 * 60_000)))}h ago`;
 
   const dayDiff = Math.floor(diffMs / (24 * 60 * 60_000));
-  if (dayDiff === 1) return 'Active yesterday';
-  if (dayDiff < 7) return `Active ${dayDiff}d ago`;
+  if (dayDiff === 1) return 'Yesterday';
+  if (dayDiff < 7) return `${dayDiff}d ago`;
 
-  return 'Active recently';
+  return 'Last seen recently';
 }

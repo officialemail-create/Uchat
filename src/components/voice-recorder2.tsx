@@ -3,7 +3,7 @@ import { Mic, Pause, Play, Send, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceRecorderProps {
-  onSend: (audioDataUrl: string, durationMs: number) => void;
+  onSend: (audioBlob: Blob, durationMs: number, mimeType: string) => void;
   onCancel: () => void;
   onRecordingChange?: (isRecording: boolean) => void;
 }
@@ -84,6 +84,9 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const chunksRef = useRef<Blob[]>([]);
+    const durationRef = useRef(0);
+    const recordingRef = useRef(false);
+    const visibilityHandlerRef = useRef<(() => void) | null>(null);
     const rafRef = useRef<number | null>(null);
     const previewAudioRef = useRef<HTMLAudioElement | null>(null);
     const { toast } = useToast();
@@ -96,7 +99,10 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
     // duration timer
     useEffect(() => {
       if (!isRecording) return;
-      const id = setInterval(() => setDuration((v) => v + 1), 1000);
+      const id = setInterval(() => {
+        durationRef.current += 1;
+        setDuration(durationRef.current);
+      }, 1000);
       return () => clearInterval(id);
     }, [isRecording]);
 
@@ -131,7 +137,7 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
           analyserRef.current = analyser;
 
           const loop = () => {
-            if (!analyserRef.current || !isRecording) return;
+            if (!analyserRef.current || !recordingRef.current) return;
             setWaveformData(computeLiveBars(analyserRef.current));
             rafRef.current = window.requestAnimationFrame(loop);
           };
@@ -145,6 +151,12 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
           };
           recorder.onstop = () => {
             const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+            if (blob.size > 5 * 1024 * 1024) {
+              setError("Voice note must be smaller than 5 MB.");
+              setPhase("idle");
+              setIsRecording(false);
+              return;
+            }
             setAudioBlob(blob);
             const url = URL.createObjectURL(blob);
             setPreviewUrl(url);
@@ -157,6 +169,12 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
           };
 
           mediaRecorderRef.current = recorder;
+          const handleVisibilityChange = () => {
+            if (document.hidden && recorder.state === "recording") recorder.pause();
+            if (!document.hidden && recorder.state === "paused") recorder.resume();
+          };
+          visibilityHandlerRef.current = handleVisibilityChange;
+          document.addEventListener("visibilitychange", handleVisibilityChange);
           recorder.start();
           setPhase("recording");
         } catch (err) {
@@ -178,8 +196,12 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
         streamRef.current?.getTracks().forEach((t) => t.stop());
         if (audioContextRef.current && audioContextRef.current.state !== "closed") void audioContextRef.current.close();
+        if (visibilityHandlerRef.current) {
+          document.removeEventListener("visibilitychange", visibilityHandlerRef.current);
+          visibilityHandlerRef.current = null;
+        }
       };
-    }, [isRecording, toast, duration]);
+    }, [isRecording, toast]);
 
     // decode preview waveform after recording stops
     useEffect(() => {
@@ -208,10 +230,13 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
 
     const start = useCallback(() => {
       setPhase("idle");
+      durationRef.current = 0;
+      recordingRef.current = true;
       setIsRecording(true);
     }, []);
 
     const stop = useCallback(() => {
+      recordingRef.current = false;
       setIsRecording(false);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         try { mediaRecorderRef.current.stop(); } catch {}
@@ -222,6 +247,7 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
     }, []);
 
     const handleCancel = () => {
+      recordingRef.current = false;
       // cleanup
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -235,9 +261,7 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
 
     const handleSend = async () => {
       if (!audioBlob) return;
-      // convert blob to object URL and let parent handle upload
-      const url = URL.createObjectURL(audioBlob);
-      onSend(url, Math.max(1, Math.round((previewDuration || duration) * 1000)));
+      onSend(audioBlob, Math.max(1, Math.round((previewDuration || duration) * 1000)), audioBlob.type || "audio/webm");
       // cleanup
       setPreviewUrl(null);
       setAudioBlob(null);

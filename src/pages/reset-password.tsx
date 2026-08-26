@@ -52,7 +52,7 @@ export default function ResetPassword() {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center px-6" style={{ background: BG }}>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[340px] flex flex-col items-center gap-6 text-center">
-          <CheckCircle size={56} style={{ color: "#22C55E" }} />
+          <CheckCircle size={56} style={{ color: "#8B5CF6" }} />
           <div>
             <h2 className="text-xl font-bold text-white">Password reset!</h2>
             <p className="text-sm mt-2" style={{ color: "#A1A1AA" }}>You can now log in with your new password.</p>

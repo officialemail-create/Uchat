@@ -38,7 +38,7 @@ import { useSettingsStore, ACCENT_PRESETS, type FontSize } from "@/store/setting
 import { useChatStore } from "@/store/chatStore";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { authApi, resolveAvatarUrl } from "@/lib/auth";
+import { authApi, getSessionToken, resolveAvatarUrl } from "@/lib/auth";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAuthStore } from "@/store/authStore";
 
@@ -47,8 +47,6 @@ interface SettingsModalProps {
   onClose: () => void;
   initialSection?: "account" | null;
 }
-
-const PROFILE_PIC_KEY = "uchat_profile_pic";
 
 type ToggleKey = "showOnlineStatus" | "showLastSeen" | "readReceipts" | "blockUnknownUsers" | "muteAll" | "messageSounds" | "desktopNotifications" | "vibration" | "showLockPreview";
 
@@ -127,8 +125,7 @@ function SettingsAccountCard({ onClose, sectionRef }: { onClose: () => void; sec
   const { currentUsername, avatarColor, setAvatarColor } = useChatStore();
   const { user, setUser } = useAuthStore();
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(() => {
-    const stored = localStorage.getItem(PROFILE_PIC_KEY);
-    return stored ?? resolveAvatarUrl(user?.profilePicture ?? null) ?? null;
+    return resolveAvatarUrl(user?.profilePicture ?? null);
   });
   const [displayName, setDisplayName] = useState(currentUsername ?? "");
   const [bio, setBio] = useState("");
@@ -140,7 +137,7 @@ function SettingsAccountCard({ onClose, sectionRef }: { onClose: () => void; sec
   const { toast } = useToast();
 
   useEffect(() => {
-    const nextPic = resolveAvatarUrl(user?.profilePicture ?? null) ?? localStorage.getItem(PROFILE_PIC_KEY);
+    const nextPic = resolveAvatarUrl(user?.profilePicture ?? null);
     setProfilePicUrl(nextPic);
   }, [user?.profilePicture]);
 
@@ -179,7 +176,10 @@ function SettingsAccountCard({ onClose, sectionRef }: { onClose: () => void; sec
       const { uploadURL, objectPath } = await res.json() as { uploadURL: string; objectPath: string };
       const putRes = await fetch(uploadURL, {
         method: "PUT",
-        headers: { "Content-Type": file.type },
+        headers: {
+          "Content-Type": file.type,
+          Authorization: `Bearer ${getSessionToken() ?? ""}`,
+        },
         body: file,
       });
       if (!putRes.ok) throw new Error("Upload failed");
@@ -189,7 +189,6 @@ function SettingsAccountCard({ onClose, sectionRef }: { onClose: () => void; sec
       const profileRes = await authApi.updateProfile({ profilePicture: servingUrl });
       
       // Update local state and auth store with the response from server
-      localStorage.setItem(PROFILE_PIC_KEY, servingUrl);
       setProfilePicUrl(servingUrl);
       setUser(profileRes);
     } catch (err) {
@@ -389,7 +388,7 @@ function PrivacySettings() {
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Security status</p>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Two-factor authentication is {twoFactorEnabled ? "enabled" : "disabled"}.</p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${twoFactorEnabled ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"}`}>{twoFactorEnabled ? "Enabled" : "Disabled"}</span>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${twoFactorEnabled ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"}`}>{twoFactorEnabled ? "Enabled" : "Disabled"}</span>
         </div>
         <div className="mt-4 flex gap-3">
           <SectionButton variant="primary">Manage</SectionButton>
@@ -602,7 +601,7 @@ function SettingsDangerCard({ onClose }: { onClose: () => void }) {
       await authApi.deleteAccount(password);
       localStorage.removeItem("uchat_username");
       logout();
-      toast({ title: "Account deleted", description: "Your account has been permanently removed.", className: "bg-green-600 text-white" });
+      toast({ title: "Account deleted", description: "Your account has been permanently removed.", className: "bg-purple-600 text-white" });
       setConfirmOpen(false);
       onClose();
     } catch (error) {

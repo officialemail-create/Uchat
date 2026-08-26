@@ -6,9 +6,10 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
+import { socketService } from "@/services/socket";
 import { useRoomStore } from "@/store/roomStore";
 import { useDmStore } from "@/store/dmStore";
-import { useGetRooms, useGetPrivateChats, getFriendRequests, acceptFriendRequest, declineFriendRequest, type Room, type Chat } from "@workspace/api-client-react";
+import { useGetRooms, useGetPrivateChats, getGetPrivateChatsQueryKey, getFriendRequests, acceptFriendRequest, declineFriendRequest, type Room, type Chat } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import SettingsModal from "@/components/settings-modal";
@@ -44,6 +45,18 @@ export function Sidebar() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location]);
+
+  useEffect(() => {
+    const socket = socketService.connect();
+    const onUserProfileUpdated = () => {
+      void queryClient.invalidateQueries({ queryKey: getGetPrivateChatsQueryKey() });
+    };
+
+    socket.on("user_profile_updated", onUserProfileUpdated);
+    return () => {
+      socket.off("user_profile_updated", onUserProfileUpdated);
+    };
+  }, [queryClient]);
 
   const incomingRequests = useMemo(
     () => pendingRequestsData?.requests?.filter((request) => request.receiverId === user?.id) ?? [],

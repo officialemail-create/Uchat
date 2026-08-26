@@ -15,7 +15,7 @@ interface ChatInputProps {
   onCancelReply?: () => void;
   onUpload?: (file: File) => void;
   onCameraUpload?: (file: File) => void;
-  onVoiceSend?: (audioDataUrl: string, durationMs: number) => void;
+  onVoiceSend?: (audioBlob: Blob, durationMs: number, mimeType: string) => void;
   isEditing?: boolean;
   onCancelEdit?: () => void;
   disabled?: boolean;
@@ -125,8 +125,8 @@ export function ChatInput({ value, onChange, onSend, replyingTo, onCancelReply, 
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleVoiceSend = (audioDataUrl: string, durationMs: number) => {
-    onVoiceSend?.(audioDataUrl, durationMs);
+  const handleVoiceSend = (audioBlob: Blob, durationMs: number, mimeType: string) => {
+    onVoiceSend?.(audioBlob, durationMs, mimeType);
     setShowVoiceRecorder(false);
   };
 

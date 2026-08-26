@@ -72,7 +72,7 @@ export default function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
   const visibleGroups = filteredGroups.length > 0 ? filteredGroups : GROUPS;
 
   return (
-    <div data-emoji-picker-root style={{ background: "#121212", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.6)", width: 360, maxHeight: 320 }} className="flex flex-col overflow-hidden">
+    <div data-emoji-picker-root style={{ background: "#121212", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.6)", width: "min(360px, 100%)", maxHeight: 320 }} className="flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/6">
         <input
           type="text"

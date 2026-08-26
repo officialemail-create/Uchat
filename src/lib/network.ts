@@ -57,7 +57,7 @@ export function useNetworkQuality() {
 }
 
 export const QUALITY_COLOR: Record<NetworkQuality, string> = {
-  excellent: '#22C55E',
+  excellent: '#8B5CF6',
   good: '#f59e0b',
   weak: '#f97316',
   poor: '#ef4444',

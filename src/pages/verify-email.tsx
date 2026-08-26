@@ -45,7 +45,7 @@ export default function VerifyEmail() {
         )}
         {status === "success" && (
           <>
-            <CheckCircle size={48} style={{ color: "#22C55E" }} />
+            <CheckCircle size={48} style={{ color: "#8B5CF6" }} />
             <div>
               <h2 className="text-xl font-bold text-white">Email verified!</h2>
               <p className="text-sm mt-2" style={{ color: "#A1A1AA" }}>{message}</p>

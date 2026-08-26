@@ -141,7 +141,7 @@ function AudioAttachment({ item }: { item: AttachmentItem }) {
       }}
     >
       <div className="flex items-center gap-2">
-        <FileAudio className="w-4 h-4 shrink-0" style={{ color: "#22C55E" }} />
+        <FileAudio className="w-4 h-4 shrink-0" style={{ color: "#8B5CF6" }} />
         <span
           className="text-[12px] truncate"
           style={{ color: "rgba(255,255,255,0.7)" }}
@@ -197,7 +197,7 @@ function FileCard({ item }: { item: AttachmentItem }) {
     >
       <div
         className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-        style={{ background: "rgba(34,197,94,0.12)", color: "#22C55E" }}
+        style={{ background: "rgba(139,92,246,0.12)", color: "#8B5CF6" }}
       >
         {getFileIcon(item.mimeType)}
       </div>

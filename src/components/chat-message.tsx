@@ -26,11 +26,11 @@ interface ChatMessageProps {
   onReact?: (emoji: string) => void;
 }
 
-const AVATAR_COLORS = ["#22C55E","#6366f1","#8b5cf6","#ec4899","#f59e0b","#ef4444","#06b6d4","#3b82f6"];
+const AVATAR_COLORS = ["#8B5CF6","#6366f1","#8b5cf6","#ec4899","#f59e0b","#ef4444","#06b6d4","#3b82f6"];
 const QUICK_REACTIONS = ["👍","❤️","😂","😮","😢","👎"];
-const OWN_BG = "#163024";
+const OWN_BG = "#2E1A4F";
 const OTHER_BG = "#1A1F2E";
-const ACCENT = "#22C55E";
+const ACCENT = "#8B5CF6";
 
 function autoAvatarColor(name: string): string {
   let h = 0;
@@ -103,6 +103,9 @@ const ChatMessage = memo(function ChatMessage({
   const [isHearted, setIsHearted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef(0);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchHandledRef = useRef(false);
   const {
     unsendMessage, selectedMenuMessageId, setSelectedMenuMessageId,
     avatarColor, currentUsername, pendingIds, dataSaverMode,
@@ -116,6 +119,7 @@ const ChatMessage = memo(function ChatMessage({
     : null;
 
   const hasText = !message.unsent && !message.voiceNote && message.message.trim().length > 0;
+  const hasHeartReaction = reactions?.some((reaction) => reaction.emoji === "❤️" && reaction.users.includes(currentUsername ?? "")) ?? false;
 
   useEffect(() => {
     if (selectedMenuMessageId !== message.id && menuOpen) setMenuOpen(false);
@@ -135,8 +139,8 @@ const ChatMessage = memo(function ChatMessage({
     !message.voiceNote && !message.unsent,
   );
 
-  const openMenu = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openMenu = useCallback((e?: React.SyntheticEvent) => {
+    e?.stopPropagation();
     setMenuOpen(true);
     setSelectedMenuMessageId(message.id);
   }, [message.id, setSelectedMenuMessageId]);
@@ -150,17 +154,67 @@ const ChatMessage = memo(function ChatMessage({
     if (!message.voiceNote) navigator.clipboard.writeText(message.message).catch(() => {});
   }, [message.message, message.voiceNote]);
 
+  const handleReact = useCallback((emoji: string) => {
+    if (emoji === "❤️") setIsHearted((previous) => !previous);
+    onReact?.(emoji);
+  }, [onReact]);
+
   const triggerHeart = useCallback(() => {
     if (message.unsent || message.voiceNote) return;
-    setShowHeart(true); setIsHearted(true);
+    const currentlyHearted = isHearted || hasHeartReaction;
+    setShowHeart(!currentlyHearted);
+    handleReact("❤️");
     setTimeout(() => setShowHeart(false), 800);
-  }, [message.unsent, message.voiceNote]);
+  }, [message.unsent, message.voiceNote, isHearted, hasHeartReaction, handleReact]);
 
   const handleDoubleTap = useCallback(() => {
+    if (touchHandledRef.current) {
+      touchHandledRef.current = false;
+      return;
+    }
     const now = Date.now();
     if (now - lastTapRef.current < 350) triggerHeart();
     lastTapRef.current = now;
   }, [triggerHeart]);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch") return;
+    touchStartRef.current = { x: event.clientX, y: event.clientY };
+    touchHandledRef.current = false;
+    clearLongPress();
+    longPressTimerRef.current = setTimeout(() => {
+      touchHandledRef.current = true;
+      openMenu();
+    }, 550);
+  }, [clearLongPress, openMenu]);
+
+  const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch" || !touchStartRef.current) return;
+    const movedX = Math.abs(event.clientX - touchStartRef.current.x);
+    const movedY = Math.abs(event.clientY - touchStartRef.current.y);
+    if (movedX > 10 || movedY > 10) clearLongPress();
+  }, [clearLongPress]);
+
+  const handlePointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch" || !touchStartRef.current) return;
+    clearLongPress();
+    const deltaX = event.clientX - touchStartRef.current.x;
+    const deltaY = Math.abs(event.clientY - touchStartRef.current.y);
+    touchStartRef.current = null;
+    if (deltaX > 64 && deltaX > deltaY * 1.25) {
+      touchHandledRef.current = true;
+      onReply();
+    }
+  }, [clearLongPress, onReply]);
+
+  useEffect(() => clearLongPress, [clearLongPress]);
 
   const time = format(new Date(message.timestamp as unknown as string), "HH:mm");
   const emojiOnly = !message.unsent && !message.voiceNote && !attachments && isEmojiOnly(message.message);
@@ -174,13 +228,19 @@ const ChatMessage = memo(function ChatMessage({
   return (
     <div
       id={`msg-${message.id}`}
+      ref={containerRef}
       className={cn(
         "flex w-full",
         isOwn ? "justify-end" : "justify-start",
-        isConsecutive ? "mt-[2px]" : "mt-3",
+        isConsecutive ? "mt-1" : "mt-1.5",
         isMatch && "rounded-xl bg-primary/10"
       )}
       onClick={handleDoubleTap}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={clearLongPress}
+      style={{ touchAction: "pan-y" }}
     >
       {/* Others' avatar */}
       {!isOwn && (
@@ -196,9 +256,9 @@ const ChatMessage = memo(function ChatMessage({
         </div>
       )}
 
-      <div ref={containerRef} className={cn("flex flex-col max-w-[72%] md:max-w-[60%]", isOwn ? "items-end" : "items-start")}>
+      <div className={cn("flex flex-col max-w-[72%] md:max-w-[60%]", isOwn ? "items-end" : "items-start")}>
         {!isOwn && !isConsecutive && !message.unsent && (
-          <span className="mb-1 ml-1 text-sm font-semibold leading-none" style={{ color: senderColor }}>
+          <span className="mb-1 ml-1 max-w-full truncate text-sm font-semibold leading-none" style={{ color: senderColor }}>
             {message.senderName}
           </span>
         )}
@@ -227,7 +287,7 @@ const ChatMessage = memo(function ChatMessage({
         )}
 
         {/* Bubble row */}
-        <div className={cn("group flex items-end gap-1", isOwn ? "flex-row-reverse" : "flex-row")}>
+        <div className="group relative flex flex-row items-end gap-1">
           {/* Own options */}
           {isOwn && !message.unsent && !isPending && (
             <div className="relative self-center shrink-0">
@@ -254,23 +314,28 @@ const ChatMessage = memo(function ChatMessage({
 
           {/* Others' options */}
           {!isOwn && !message.unsent && (
-            <div className="relative self-center shrink-0">
-              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className={cn(
+                "absolute left-0 top-1/2 z-10 flex -translate-x-full -translate-y-1/2 items-center gap-0.5 pr-1",
+                menuOpen
+                  ? "opacity-100 pointer-events-auto"
+                  : "opacity-0 pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto",
+              )}>
                 <button
-                  className="p-1 rounded-full transition-colors"
-                  style={{ color: "rgba(255,255,255,0.25)" }}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-white/55 transition-colors hover:bg-primary/15 hover:text-primary"
                   onClick={(e) => { e.stopPropagation(); onReply(); }}
+                  aria-label="Reply to message"
+                  title="Reply"
                 >
                   <CornerUpLeft className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  className={cn("p-1 rounded-full transition-all", menuOpen && "opacity-100")}
-                  style={{ color: "rgba(255,255,255,0.25)" }}
+                  className={cn("flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface text-white/55 transition-colors hover:bg-primary/15 hover:text-primary", menuOpen && "bg-primary/15 text-primary")}
                   onClick={openMenu}
+                  aria-label="Options"
+                  title="Message options"
                 >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
-              </div>
               <MessageOptionsMenu
                 open={menuOpen} onClose={() => setMenuOpen(false)}
                 onReply={() => { onReply(); setMenuOpen(false); }}
@@ -300,7 +365,7 @@ const ChatMessage = memo(function ChatMessage({
                 {QUICK_REACTIONS.map((emoji) => (
                   <button
                     key={emoji}
-                    onClick={(e) => { e.stopPropagation(); onReact(emoji); }}
+                    onClick={(e) => { e.stopPropagation(); handleReact(emoji); }}
                     className="w-7 h-7 flex items-center justify-center text-base hover:scale-125 active:scale-90 transition-transform"
                   >
                     {emoji}
@@ -333,8 +398,8 @@ const ChatMessage = memo(function ChatMessage({
                     message.unsent ? "bg-background/40 text-muted opacity-90 px-4 py-3" :
                     message.voiceNote ? "bg-surface/95 text-foreground px-4 py-3 min-w-[260px]" :
                     isPending ? "bg-primary/10 ring-1 ring-primary/60 text-foreground px-4 py-3" :
-                    isOwn ? "bg-surface text-foreground px-4 py-3" :
-                    "bg-surface/90 text-foreground px-4 py-3"
+                    isOwn ? "bg-primary/90 text-primary-foreground px-4 py-3" :
+                    "bg-[#1F2937] text-foreground px-4 py-3"
                   )}
                 >
                   {message.voiceNote && !message.unsent ? (
@@ -405,7 +470,7 @@ const ChatMessage = memo(function ChatMessage({
             )}
 
             {/* Heart badge */}
-            {isHearted && !message.unsent && (
+            {(isHearted || hasHeartReaction) && !message.unsent && (
               <div
                 className={cn("absolute -bottom-2.5", isOwn ? "right-1" : "left-1")}
                 style={{
@@ -422,7 +487,7 @@ const ChatMessage = memo(function ChatMessage({
           </div>
         </div>
 
-        {isHearted && !message.unsent && <div className="h-3" />}
+        {(isHearted || hasHeartReaction) && !message.unsent && <div className="h-3" />}
 
         {/* Reaction pills */}
         {reactions && reactions.length > 0 && (
@@ -432,7 +497,7 @@ const ChatMessage = memo(function ChatMessage({
               return (
                 <button
                   key={r.emoji}
-                  onClick={(e) => { e.stopPropagation(); onReact?.(r.emoji); }}
+                  onClick={(e) => { e.stopPropagation(); handleReact(r.emoji); }}
                   className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs transition-all hover:opacity-80 active:scale-95"
                   style={{
                     background: isMine ? `${ACCENT}14` : "rgba(255,255,255,0.06)",

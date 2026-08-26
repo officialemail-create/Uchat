@@ -12,6 +12,7 @@ import UploadModal from "./upload-modal";
 import { useFileUpload } from "@/hooks/use-file-upload";
 import { insertEmojiAtCursor } from "@/lib/emoji-utils";
 import { useToast } from "@/hooks/use-toast";
+import { authApi } from "@/lib/auth";
 
 interface ChatInputProps {
   replyingTo: Message | null;
@@ -21,7 +22,7 @@ interface ChatInputProps {
 }
 
 const MAX_LENGTH = 2000;
-const ACCENT = "#22C55E";
+const ACCENT = "#8B5CF6";
 const INPUT_BG = "#0B0F19";
 const FIELD_BG = "#1A1F2E";
 
@@ -155,14 +156,13 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
     });
 
     socket.emit("send_message", {
-      senderId: currentUserId,
-      senderName: currentUsername,
-      message: clean,
-      replyTo: replyingTo?.id,
-      _pendingKey: pendingKey,
+      room: "global",
+      content: clean,
+      clientMessageId: pendingKey,
       attachments: readyAttachments.length > 0 ? readyAttachments : undefined,
     }, (response: { ok?: boolean; code?: string; error?: string }) => {
       if (response?.ok) return;
+      useChatStore.getState().deleteMessage(pendingId);
       toast({
         title: response?.code === "USER_NOT_FOUND" ? "User not found" : "Message not sent",
         description: response?.error ?? "Please try again.",
@@ -176,16 +176,24 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
     emitTyping(false);
   };
 
-  const handleVoiceSend = (audioDataUrl: string, durationMs: number) => {
+  const handleVoiceSend = async (audioBlob: Blob, durationMs: number, mimeType: string) => {
     const socket = socketService.getSocket();
     if (!socket || !currentUsername) return;
+
+    let uploaded: { audioUrl: string };
+    try {
+      uploaded = await authApi.uploadVoiceNote(audioBlob, mimeType);
+    } catch (error) {
+      toast({ title: "Voice note failed", description: error instanceof Error ? error.message : "Unable to upload voice note", variant: "destructive" });
+      return;
+    }
 
     const pendingKey = crypto.randomUUID();
     const pendingId = `pending-${pendingKey}`;
     addPendingMessage({
       id: pendingId,
       senderName: currentUsername,
-      message: audioDataUrl,
+      message: uploaded.audioUrl,
       timestamp: new Date().toISOString(),
       edited: false,
       unsent: false,
@@ -198,11 +206,14 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
     });
 
     socket.emit("send_voice_note", {
-      senderName: currentUsername,
-      audioDataUrl,
+      room: "global",
+      audioUrl: uploaded.audioUrl,
+      mimeType,
+      size: audioBlob.size,
       duration: durationMs,
-      _pendingKey: pendingKey,
-      replyTo: replyingTo?.id,
+      clientMessageId: pendingKey,
+    }, (response: { ok?: boolean }) => {
+      if (!response?.ok) useChatStore.getState().deleteMessage(pendingId);
     });
     setShowVoiceRecorder(false);
     onCancelReply();
@@ -336,20 +347,15 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute z-50 mb-1"
+              className="fixed inset-x-2 bottom-[76px] z-[60] flex justify-center"
               style={{
-                bottom: "100%",
-                left: 0,
                 background: "transparent",
                 borderRadius: "12px",
-                display: "flex",
-                justifyContent: "flex-start",
-                width: "100%",
                 pointerEvents: "auto",
               }}
               data-emoji-picker-root
             >
-              <div style={{ marginLeft: 8 }}>
+              <div className="w-full max-w-[360px]">
                 <EmojiPicker onSelect={insertEmoji} onClose={() => setIsPickerOpen(false)} />
               </div>
             </motion.div>
@@ -587,10 +593,12 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
         <div className="flex items-end gap-2 px-3 pb-4 pt-1">
           <div className="flex items-end gap-0.5 mb-0.5 shrink-0">
             <button
-              onClick={() => setIsPickerOpen(true)}
+              onClick={() => setIsPickerOpen((open) => !open)}
               className="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
               style={{ color: isPickerOpen ? "#8b5cf6" : "rgba(255,255,255,0.35)" }}
               title="Emoji"
+              aria-label="Choose emoji"
+              aria-expanded={isPickerOpen}
             >
               <Smile className="w-5 h-5" />
             </button>

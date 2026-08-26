@@ -17,6 +17,9 @@ export type DmMessage = {
   kind?: 'text' | 'image' | 'voice';
   attachmentUrl?: string;
   attachmentName?: string;
+  voiceDuration?: number | null;
+  voiceMimeType?: string;
+  voiceSize?: number;
   _pendingKey?: string;
 };
 
@@ -39,9 +42,12 @@ export function normalizeDmMessage(message: Partial<DmMessage> & Record<string, 
     unsent: message.unsent,
     starred: message.starred,
     reactions,
-    kind: message.kind ?? 'text',
-    attachmentUrl: message.attachmentUrl,
+    kind: message.kind ?? (message.voiceNote || message.voice_note ? 'voice' : 'text'),
+    attachmentUrl: message.attachmentUrl ?? message.audioUrl ?? message.audio_url,
     attachmentName: message.attachmentName,
+    voiceDuration: message.voiceDuration ?? message.duration ?? null,
+    voiceMimeType: message.voiceMimeType ?? message.mimeType,
+    voiceSize: message.voiceSize ?? message.size,
     _pendingKey: message._pendingKey,
   };
 }

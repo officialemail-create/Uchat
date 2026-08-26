@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const AVATAR_COLORS = ["#35c522","#6366f1","#8b5cf6","#ec4899","#f59e0b","#ef4444","#06b6d4","#3b82f6"];
+const AVATAR_COLORS = ["#8B5CF6","#6366f1","#8b5cf6","#ec4899","#f59e0b","#ef4444","#06b6d4","#3b82f6"];
 const PANEL_BG = "#111827";
 const ACCENT = "#c52287";
 

@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Loader2, Check, X } from "lucide-react";
 import { authApi } from "@/lib/auth";
 import { UchatLogoMark } from "@/components/uchat-logo";
+import { useAuthStore } from "@/store/authStore";
+import { useChatStore } from "@/store/chatStore";
+import { socketService } from "@/services/socket";
 
 const BG = "#0B0F19";
 const CARD = "#1A1F2E";
@@ -16,7 +19,7 @@ function PasswordStrength({ password }: { password: string }) {
     { label: "Contains uppercase", ok: /[A-Z]/.test(password) },
   ];
   const score = checks.filter((c) => c.ok).length;
-  const colors = ["#EF4444", "#F59E0B", "#22C55E"];
+  const colors = ["#EF4444", "#F59E0B", "#8B5CF6"];
   return (
     <div className="flex flex-col gap-1.5 mt-1">
       <div className="flex gap-1">
@@ -30,7 +33,7 @@ function PasswordStrength({ password }: { password: string }) {
       </div>
       <div className="flex flex-col gap-0.5">
         {checks.map((c) => (
-          <div key={c.label} className="flex items-center gap-1.5 text-[11px]" style={{ color: c.ok ? "#22C55E" : "rgba(255,255,255,0.3)" }}>
+          <div key={c.label} className="flex items-center gap-1.5 text-[11px]" style={{ color: c.ok ? "#8B5CF6" : "rgba(255,255,255,0.3)" }}>
             {c.ok ? <Check size={10} /> : <X size={10} />}
             {c.label}
           </div>
@@ -42,6 +45,8 @@ function PasswordStrength({ password }: { password: string }) {
 
 export default function Register() {
   const [, setLocation] = useLocation();
+  const { setUser } = useAuthStore();
+  const { setCurrentUsername } = useChatStore();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -50,8 +55,6 @@ export default function Register() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-  const [verificationLink, setVerificationLink] = useState<string | null>(null);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
 
@@ -79,12 +82,11 @@ export default function Register() {
         password,
         confirmPassword,
       });
-      if (result.verificationRequired === false) {
-        setLocation("/login");
-        return;
-      }
-      setVerificationLink(result.verificationLink ?? null);
-      setDone(true);
+      setUser(result.user);
+      setCurrentUsername(result.user.username);
+      localStorage.setItem("uchat_username", result.user.username);
+      await socketService.ensureAuthenticated();
+      setLocation("/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Registration failed";
       setError(message);
@@ -96,39 +98,6 @@ export default function Register() {
       setLoading(false);
     }
   };
-
-  if (done) {
-    return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6" style={{ background: BG }}>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[340px] flex flex-col items-center gap-6 text-center">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: `${ACCENT}20` }}>✉️</div>
-          <div>
-            <h2 className="text-xl font-bold text-white">Check your email</h2>
-            <p className="text-sm mt-2" style={{ color: "#A1A1AA" }}>
-              We've sent a verification link to <strong className="text-white">{email}</strong>. Click it to activate your account.
-            </p>
-            {verificationLink && (
-              <p className="text-sm mt-3" style={{ color: "#A1A1AA" }}>
-                If your email doesn't arrive, you can verify directly:
-                <a href={verificationLink} target="_blank" rel="noreferrer" className="block underline mt-1">
-                  {verificationLink}
-                </a>
-              </p>
-            )}
-          </div>
-          <button
-            onClick={() => authApi.resendVerification(email).catch(() => {})}
-            className="text-sm underline" style={{ color: ACCENT }}
-          >
-            Resend email
-          </button>
-          <button onClick={() => setLocation("/login")} className="text-sm" style={{ color: "#A1A1AA" }}>
-            Back to login
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 py-10 relative overflow-hidden" style={{ background: BG }}>
@@ -221,7 +190,7 @@ export default function Register() {
               >
                 Resend verification email
               </button>
-              {resendStatus && <p className="text-[12px] mt-2" style={{ color: '#34D399' }}>{resendStatus}</p>}
+              {resendStatus && <p className="text-[12px] mt-2" style={{ color: '#A78BFA' }}>{resendStatus}</p>}
             </div>
           )}
 
