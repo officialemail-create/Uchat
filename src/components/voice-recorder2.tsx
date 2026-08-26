@@ -16,7 +16,7 @@ export type VoiceRecorderHandle = {
 
 type Phase = "idle" | "recording" | "preview";
 
-const ACCENT = "#8b5cf6"; // purple brand
+const ACCENT = "#2563eb";
 const BG = "#0B0F19";
 const CARD = "#111216";
 
@@ -228,6 +228,10 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
       return () => { cancelled = true; };
     }, [previewUrl]);
 
+    useEffect(() => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    }, [previewUrl]);
+
     const start = useCallback(() => {
       setPhase("idle");
       durationRef.current = 0;
@@ -286,10 +290,10 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
 
     return (
       <div className="flex flex-col gap-3 px-3 py-3" style={{ background: BG, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <audio ref={previewAudioRef} preload="metadata" onTimeUpdate={onPreviewTimeUpdate} onEnded={() => { setIsPreviewPlaying(false); setCurrentTime(0); }} />
+        <audio ref={previewAudioRef} src={previewUrl ?? undefined} preload="metadata" onTimeUpdate={onPreviewTimeUpdate} onEnded={() => { setIsPreviewPlaying(false); setCurrentTime(0); }} />
 
         <div className="flex items-center justify-between text-[12px] text-white/70">
-          <span>{phase === "idle" ? "R ecord" : phase === "recording" ? "Recording voice note" : "Preview voice note"}</span>
+          <span>{phase === "idle" ? "Voice note" : phase === "recording" ? "Recording" : "Preview"}</span>
           <span>{fmt(phase === "recording" ? duration : previewDuration || duration)}</span>
         </div>
 
@@ -298,7 +302,7 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
             <button type="button" onClick={() => { if (!isRecording) start(); else stop(); }} className={`flex h-14 w-14 items-center justify-center rounded-full border border-purple-400/30 bg-purple-600/10 text-purple-100 transition ${isRecording ? "scale-95 bg-red-600/30" : "hover:bg-purple-600/15"}`} aria-label="Record voice note">
               <Mic className="h-6 w-6" />
             </button>
-            <p className="mt-3 text-[13px] text-white/60">Click to record, click again to stop.</p>
+            <p className="mt-3 text-[13px] text-white/60">Tap the microphone to begin</p>
           </div>
         )}
 
@@ -310,7 +314,7 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
               ))}
             </div>
             <div className="flex items-center justify-center gap-3">
-              <button onClick={() => stop()} className="px-4 py-2 rounded-md bg-red-600 text-white">Stop</button>
+              <button onClick={() => stop()} className="px-4 py-2 rounded-lg bg-red-600 text-white">Stop recording</button>
             </div>
           </div>
         )}
@@ -325,15 +329,15 @@ const VoiceRecorder = React.forwardRef<VoiceRecorderHandle, VoiceRecorderProps>(
 
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <button onClick={togglePlay} className="w-10 h-10 rounded-full bg-white/6 flex items-center justify-center text-white">
+                <button type="button" onClick={togglePlay} aria-label={isPreviewPlaying ? "Pause preview" : "Play preview"} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white transition hover:bg-white/15">
                   {isPreviewPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 </button>
                 <div className="text-sm text-white/70">{fmt(previewDuration)}</div>
               </div>
 
               <div className="flex items-center gap-2">
-                <button onClick={handleCancel} className="px-3 py-2 rounded-md bg-gray-800 text-white/80 flex items-center gap-2"><Trash2 className="w-4 h-4" />Cancel</button>
-                <button onClick={handleSend} className="px-3 py-2 rounded-md" style={{ background: ACCENT, color: "white" }} disabled={!audioBlob}><Send className="w-4 h-4" />Send</button>
+                <button type="button" onClick={handleCancel} className="px-3 py-2 rounded-lg bg-gray-800 text-white/80 flex items-center gap-2 transition hover:bg-gray-700"><Trash2 className="w-4 h-4" />Discard</button>
+                <button type="button" onClick={handleSend} className="px-3 py-2 rounded-lg flex items-center gap-2" style={{ background: ACCENT, color: "white" }} disabled={!audioBlob}><Send className="w-4 h-4" />Send</button>
               </div>
             </div>
 

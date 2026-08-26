@@ -47,7 +47,9 @@ const VoiceMessageBubble = memo(function VoiceMessageBubble({ src, duration, isM
 
   useEffect(() => {
     let cancelled = false;
-    const ctx = new AudioContext();
+    const AudioContextConstructor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextConstructor) return;
+    const ctx = new AudioContextConstructor();
 
     fetch(src)
       .then((response) => response.arrayBuffer())

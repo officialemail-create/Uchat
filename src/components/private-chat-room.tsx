@@ -424,6 +424,14 @@ export function PrivateChatRoom({ conversation, messages, messagesLoading = fals
         mimeType,
         size: audioBlob.size,
         clientMessageId: crypto.randomUUID(),
+      }, (response: { ok?: boolean; reason?: string; code?: string }) => {
+        if (!response?.ok) {
+          toast({
+            title: "Voice note failed",
+            description: response?.reason ?? response?.code ?? "Unable to send voice note",
+            variant: "destructive",
+          });
+        }
       });
     } catch (error) {
       toast({ title: "Voice note failed", description: error instanceof Error ? error.message : "Unable to send voice note", variant: "destructive" });

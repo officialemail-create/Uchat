@@ -9,8 +9,6 @@ import { getGetRoomsQueryKey, getGetPrivateChatsQueryKey } from '@workspace/api-
 
 export function useRoomSocket() {
   const { user, setUser } = useAuthStore();
-  const roomStore = useRoomStore();
-  const dmStore = useDmStore();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -32,29 +30,29 @@ export function useRoomSocket() {
       socket.emit('join_user_channel', user.id);
 
       const onRoomNewMessage = (msg: any) => {
-        roomStore.addMessage(msg);
-        roomStore.incrementUnread(msg.roomId);
+        useRoomStore.getState().addMessage(msg);
+        useRoomStore.getState().incrementUnread(msg.roomId);
       };
 
       const onRoomMessageEdited = ({ messageId, newMessage }: any) => {
-        roomStore.updateMessage(messageId, newMessage);
+        useRoomStore.getState().updateMessage(messageId, newMessage);
       };
 
       const onRoomMessageDeleted = ({ messageId }: any) => {
-        roomStore.removeMessage(messageId);
+        useRoomStore.getState().removeMessage(messageId);
       };
 
       const onRoomTypingUpdate = ({ roomId, users }: any) => {
-        roomStore.setTyping(roomId, users);
+        useRoomStore.getState().setTyping(roomId, users);
       };
 
       const onRoomMemberJoined = ({ roomId, userId }: any) => {
-        roomStore.addOnlineMember(roomId, userId);
+        useRoomStore.getState().addOnlineMember(roomId, userId);
         queryClient.invalidateQueries({ queryKey: getGetRoomsQueryKey() });
       };
 
       const onRoomMemberLeft = ({ roomId, userId }: any) => {
-        roomStore.removeOnlineMember(roomId, userId);
+        useRoomStore.getState().removeOnlineMember(roomId, userId);
         queryClient.invalidateQueries({ queryKey: getGetRoomsQueryKey() });
       };
 
@@ -68,7 +66,9 @@ export function useRoomSocket() {
           senderName: msg.senderName ?? msg.senderId,
           timestamp: msg.timestamp ?? msg.createdAt,
         }, chatId);
-        const pending = useDmStore.getState().messages.find((message) =>
+        const currentMessages = useDmStore.getState().messages;
+        const alreadyStored = currentMessages.some((message) => message.id === normalized.id);
+        const pending = currentMessages.find((message) =>
           (msg.clientMessageId && message._pendingKey === msg.clientMessageId)
           || (message.status === 'sending'
             && message.chatId === chatId
@@ -76,60 +76,62 @@ export function useRoomSocket() {
             && message.content === normalized.content),
         );
         if (pending) {
-          dmStore.updateMessage(pending.id, { ...normalized, status: 'sent', _pendingKey: pending._pendingKey });
+          useDmStore.getState().updateMessage(pending.id, { ...normalized, status: 'sent', _pendingKey: pending._pendingKey });
         } else {
-          dmStore.addMessage({ ...normalized, status: normalized.senderId === user.id ? 'sent' : 'delivered' });
+          useDmStore.getState().addMessage({ ...normalized, status: normalized.senderId === user.id ? 'sent' : 'delivered' });
         }
-        dmStore.incrementUnread(chatId);
+        if (!alreadyStored && !pending && normalized.senderId !== user.id && normalized.senderUsername !== user.username) {
+          useDmStore.getState().incrementUnread(chatId);
+        }
         queryClient.invalidateQueries({ queryKey: getGetPrivateChatsQueryKey() });
       };
 
       const onDmMessageDeleted = ({ messageId }: any) => {
-        dmStore.removeMessage(messageId);
+        useDmStore.getState().removeMessage(messageId);
       };
 
       const onDmTypingUpdate = ({ chatId, users }: any) => {
-        dmStore.setTyping(chatId, users ?? []);
+        useDmStore.getState().setTyping(chatId, users ?? []);
       };
 
       const onDmMessagesRead = ({ chatId, messageIds }: any) => {
-        if (Array.isArray(messageIds)) dmStore.markMessagesRead(chatId, messageIds);
+        if (Array.isArray(messageIds)) useDmStore.getState().markMessagesRead(chatId, messageIds);
       };
 
       const onReadUpdate = ({ chat_id: chatId, message_id: messageId }: any) => {
-        if (chatId && messageId) dmStore.markMessagesRead(chatId, [messageId]);
+        if (chatId && messageId) useDmStore.getState().markMessagesRead(chatId, [messageId]);
       };
 
       const onReadReceipt = ({ messageIds, readBy }: { messageIds?: string[]; readBy?: string }) => {
         if (!Array.isArray(messageIds) || !readBy || readBy === user.id) return;
         messageIds.forEach((messageId) => {
-          const message = dmStore.messages.find((candidate) => candidate.id === messageId);
+          const message = useDmStore.getState().messages.find((candidate) => candidate.id === messageId);
           if (message && (message.senderId === user.id || message.senderUsername === user.username)) {
-            dmStore.markMessagesRead(message.chatId, [messageId]);
+            useDmStore.getState().markMessagesRead(message.chatId, [messageId]);
           }
         });
       };
 
       const onUserOnline = (presence: any) => {
         if (!presence?.userId) return;
-        dmStore.setPresence(presence.userId, { ...presence, online: true });
+        useDmStore.getState().setPresence(presence.userId, { ...presence, online: true });
         queryClient.invalidateQueries({ queryKey: getGetPrivateChatsQueryKey() });
       };
 
       const onUserOffline = (presence: any) => {
         if (!presence?.userId) return;
-        dmStore.setPresence(presence.userId, { ...presence, online: false });
+        useDmStore.getState().setPresence(presence.userId, { ...presence, online: false });
         queryClient.invalidateQueries({ queryKey: getGetPrivateChatsQueryKey() });
       };
       const onPresenceHidden = ({ userId }: { userId?: string }) => {
         if (!userId) return;
-        dmStore.setPresence(userId, { online: false });
+        useDmStore.getState().setPresence(userId, { online: false });
         queryClient.invalidateQueries({ queryKey: getGetPrivateChatsQueryKey() });
       };
 
       const onUserPresenceChange = (presence: any) => {
         if (!presence?.userId) return;
-        dmStore.setPresence(presence.userId, presence);
+        useDmStore.getState().setPresence(presence.userId, presence);
       };
 
       const onUserProfileUpdated = (profileData: any) => {
@@ -190,5 +192,5 @@ export function useRoomSocket() {
       cancelled = true;
       cleanup?.();
     };
-  }, [user, roomStore, dmStore, queryClient, setUser]);
+  }, [user, queryClient, setUser]);
 }

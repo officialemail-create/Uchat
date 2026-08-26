@@ -60,7 +60,7 @@ const VoicePlayer = memo(function VoicePlayer({ src, duration, isOwn, dataSaverM
     const a = audioRef.current;
     if (!a) return;
     if (isPlaying) { a.pause(); setIsPlaying(false); }
-    else { a.play(); setIsPlaying(true); }
+    else { void a.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false)); }
   };
 
   const cycleSpeed = () => {

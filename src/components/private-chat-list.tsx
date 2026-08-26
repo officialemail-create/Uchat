@@ -18,6 +18,7 @@ import { SkeletonRows } from "@/components/skeletons";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { resolveAvatarUrl } from "@/lib/auth";
 import { apiUrl } from "@/lib/api-url";
+import type { DmMessage } from "@/store/dmStore";
 
 function highlightMatch(text: string, query: string) {
   if (!query) return <>{text}</>;
@@ -53,6 +54,19 @@ type ChatListItem = {
   showOnlineStatus?: boolean;
   isSelected?: boolean;
 };
+
+export function getMessagePreview(message: DmMessage | null, fallbackUsername: string): string {
+  if (!message) return fallbackUsername;
+  if (message.unsent) return "Message deleted";
+  if (message.kind === "image" || message.attachmentUrl || message.attachmentName) return "Photo";
+  if (message.kind === "voice" || message.voiceDuration) return "Voice message";
+  const messageKind = String(message.kind ?? "");
+  if (messageKind === "system") return message.content.trim() || "System message";
+
+  const content = message.content.trim();
+  if (!content) return fallbackUsername;
+  return content.length > 30 ? `${content.slice(0, 30).trimEnd()}...` : content;
+}
 
 export type UserSearchResult = {
   id: string;
@@ -101,13 +115,18 @@ interface PrivateChatListProps {
   onAcceptedRequest?: (user: UserSearchResult) => void;
 }
 
-const ChatListItemRow = memo(function ChatListItemRow({ conversation, onSelectConversation }: { conversation: ChatListItem; onSelectConversation: (conversationId: string) => void }) {
+export const ChatItem = memo(function ChatItem({ conversation, lastMessage, unreadCount, onSelectConversation }: {
+  conversation: ChatListItem;
+  lastMessage: string;
+  unreadCount: number;
+  onSelectConversation: (conversationId: string) => void;
+}) {
   const avatarUrl = resolveAvatarUrl(conversation.profilePicture ?? null);
   return (
     <button
       type="button"
       onClick={() => onSelectConversation(conversation.id)}
-      className={`flex items-center gap-4 p-4 text-left transition-all hover:bg-gray-50 dark:hover:bg-gray-900/50 ${conversation.isSelected ? "bg-purple-50 dark:bg-purple-900/20" : ""} ${conversation.isSelected ? "border-l-4 border-purple-600" : "border-l-4 border-transparent"}`}
+      className={`flex items-center gap-4 p-4 text-left transition-all hover:bg-gray-50 dark:hover:bg-gray-900/50 ${conversation.isSelected ? "bg-purple-50 dark:bg-purple-900/20" : ""} ${unreadCount > 0 ? "bg-red-50/60 dark:bg-red-950/10" : ""} ${conversation.isSelected ? "border-l-4 border-purple-600" : "border-l-4 border-transparent"}`}
     >
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-transparent transition-all hover:border-purple-500">
         <UserAvatar src={avatarUrl} alt={conversation.displayName} size="lg" className="h-full w-full" />
@@ -118,15 +137,14 @@ const ChatListItemRow = memo(function ChatListItemRow({ conversation, onSelectCo
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-base font-semibold tracking-tight text-gray-900 dark:text-white">{conversation.displayName}</p>
-            <p className="ml-1 truncate text-xs font-mono text-gray-500 dark:text-gray-400">@{conversation.username}</p>
           </div>
           {conversation.showOnlineStatus !== false ? <span className="ml-auto text-xs font-mono text-gray-400 dark:text-gray-500">{conversation.online ? 'Online' : 'Offline'}</span> : null}
         </div>
 
         <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="line-clamp-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{conversation.lastMessage}</p>
-          {conversation.unreadCount > 0 ? (
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white">{conversation.unreadCount}</span>
+          <p className={`line-clamp-1 text-sm leading-relaxed ${unreadCount > 0 ? "font-semibold text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}>{lastMessage}</p>
+          {unreadCount > 0 ? (
+            <span aria-label={`${unreadCount} unread messages`} className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold text-white">{unreadCount}</span>
           ) : null}
         </div>
       </div>
@@ -637,7 +655,7 @@ export function PrivateChatList({ conversations, conversationsLoading = false, o
           <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
               {filteredConversations.map((conversation) => (
-                <ChatListItemRow key={conversation.id} conversation={conversation} onSelectConversation={onSelectConversation} />
+                <ChatItem key={conversation.id} conversation={conversation} lastMessage={conversation.lastMessage} unreadCount={conversation.unreadCount} onSelectConversation={onSelectConversation} />
               ))}
             </div>
           </div>

@@ -212,8 +212,15 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
       size: audioBlob.size,
       duration: durationMs,
       clientMessageId: pendingKey,
-    }, (response: { ok?: boolean }) => {
-      if (!response?.ok) useChatStore.getState().deleteMessage(pendingId);
+    }, (response: { ok?: boolean; reason?: string; code?: string }) => {
+      if (!response?.ok) {
+        useChatStore.getState().deleteMessage(pendingId);
+        toast({
+          title: "Voice note failed",
+          description: response?.reason ?? response?.code ?? "Unable to send voice note",
+          variant: "destructive",
+        });
+      }
     });
     setShowVoiceRecorder(false);
     onCancelReply();

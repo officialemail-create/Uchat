@@ -93,7 +93,7 @@ export default function ChatHeader({ searchQuery, onSearchChange, onOpenUsersPan
               <div className="flex items-center gap-1.5">
                 <span className="text-xl font-bold tracking-tight text-white">Global Chat</span>
               </div>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/55">Feel free to talk!</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/55">NOW:This space is for comments & Ideas!</span>
             </div>
 
             {/* Right actions */}
