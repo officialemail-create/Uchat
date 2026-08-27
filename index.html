@@ -34,7 +34,13 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(error => {
+          const hadController = Boolean(navigator.serviceWorker.controller);
+          if (hadController) {
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              window.location.reload();
+            }, { once: true });
+          }
+          navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(error => {
             console.error('ServiceWorker registration failed:', error);
           });
         });
