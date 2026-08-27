@@ -68,7 +68,6 @@ interface DmStore {
   
   setTyping: (chatId: string, users: string[]) => void;
   incrementUnread: (chatId: string) => void;
-  setUnreadCount: (chatId: string, count: number) => void;
   clearUnread: (chatId: string) => void;
   setPresence: (userId: string, presence: UserPresence) => void;
   reset: () => void;
@@ -120,10 +119,6 @@ export const useDmStore = create<DmStore>((set) => ({
   incrementUnread: (chatId) =>
     set((state) => ({
       unreadCounts: { ...state.unreadCounts, [chatId]: (state.unreadCounts[chatId] || 0) + 1 },
-    })),
-  setUnreadCount: (chatId, count) =>
-    set((state) => ({
-      unreadCounts: { ...state.unreadCounts, [chatId]: Math.max(0, count) },
     })),
   clearUnread: (chatId) =>
     set((state) => ({
