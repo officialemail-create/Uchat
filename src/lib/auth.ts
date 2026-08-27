@@ -117,9 +117,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return json as T;
 }
 
-export interface RegisterResponse extends AuthResponse {
+export interface RegisterResponse {
   message: string;
   userId: string;
+  verificationLink?: string;
 }
 
 export function resolveAvatarUrl(value: string | null | undefined): string | null {
@@ -137,29 +138,8 @@ export function resolveAvatarUrl(value: string | null | undefined): string | nul
 }
 
 export const authApi = {
-  register: async (data: { email: string; username: string; displayName: string; password: string; confirmPassword: string }) => {
-    const res = await request<RegisterResponse>("/auth/register", { method: "POST", body: JSON.stringify(data) });
-    const token = res.access_token ?? res.token;
-    if (token) setSessionToken(token);
-    return res;
-  },
-
-  uploadVoiceNote: async (blob: Blob, mimeType: string) => {
-    const extension = mimeType.includes("mp4") || mimeType.includes("aac") ? "m4a" : mimeType.includes("ogg") ? "ogg" : "webm";
-    const response = await fetch(apiUrl("/voice-notes"), {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        Authorization: `Bearer ${getSessionToken() ?? ""}`,
-        "x-username": localStorage.getItem("uchat_username") ?? "",
-        "Content-Type": mimeType,
-      },
-      body: blob,
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new AuthRequestError(body.error ?? "Voice note upload failed", response.status);
-    return body as { audioUrl: string; size: number; mimeType: string; extension: string };
-  },
+  register: (data: { email: string; username: string; displayName: string; password: string; confirmPassword: string }) =>
+    request<RegisterResponse>("/auth/register", { method: "POST", body: JSON.stringify(data) }),
 
   login: async (data: { identifier: string; password: string }) => {
     clearSessionState();

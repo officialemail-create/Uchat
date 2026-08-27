@@ -25,7 +25,6 @@ import { SplashScreen } from "@/components/splash-screen";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { socketService } from "@/services/socket";
-import { useRoomSocket } from "@/hooks/use-room-socket";
 
 const queryClient = new QueryClient();
 
@@ -83,11 +82,6 @@ function Router() {
   );
 }
 
-function SocketBridge() {
-  useRoomSocket();
-  return null;
-}
-
 function AppContent() {
   const { setUser, setLoading, setAuthError, logout, authError, isLoading } = useAuthStore();
   const { setCurrentUsername } = useChatStore();
@@ -105,13 +99,8 @@ function AppContent() {
   }, [user]);
 
   useEffect(() => {
-    if (user || !isLoading) setIsAppReady(true);
-  }, [isLoading, user]);
-
-  useEffect(() => {
-    const fallbackTimer = window.setTimeout(() => setIsAppReady(true), 5000);
-    return () => window.clearTimeout(fallbackTimer);
-  }, []);
+    if (!isLoading) setIsAppReady(true);
+  }, [isLoading]);
 
   useEffect(() => {
     applySettingsToDom(useSettingsStore.getState());
@@ -165,7 +154,6 @@ function AppContent() {
   return (
     <>
       <QueryClientProvider client={queryClient}>
-        <SocketBridge />
         <TooltipProvider>
           <ErrorBoundary>
             <WouterRouter>
@@ -175,7 +163,7 @@ function AppContent() {
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
-      <AnimatePresence>{!isAppReady && !user ? <SplashScreen /> : null}</AnimatePresence>
+      <AnimatePresence>{!isAppReady ? <SplashScreen /> : null}</AnimatePresence>
     </>
   );
 }

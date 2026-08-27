@@ -4,14 +4,13 @@ import { PrivateChatRoom } from "@/components/private-chat-room";
 import { Send } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
 import { socketService } from "@/services/socket";
 import { authApi, clearSessionState, getSessionToken } from "@/lib/auth";
 import { useAuthStore as authStore } from "@/store/authStore";
 import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/hooks/use-toast";
-import { useGetPrivateChats, getGetPrivateChatsQueryKey, type DmsResponse } from "@workspace/api-client-react";
-import { getMessagePreview, type UserSearchResult } from "@/components/private-chat-list";
+import { useGetPrivateChats } from "@workspace/api-client-react";
+import type { UserSearchResult } from "@/components/private-chat-list";
 import { updateLastSeen } from "@/hooks/useSupabaseRealtime";
 import { normalizeDmMessage, useDmStore } from "@/store/dmStore";
 import type { DmMessage } from "@/store/dmStore";
@@ -48,9 +47,6 @@ export default function PrivateChatsPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const dmMessages = useDmStore((state) => state.messages);
   const mergeMessages = useDmStore((state) => state.mergeMessages);
-  const unreadCounts = useDmStore((state) => state.unreadCounts);
-  const setUnreadCount = useDmStore((state) => state.setUnreadCount);
-  const clearUnread = useDmStore((state) => state.clearUnread);
   const updateMessage = useDmStore((state) => state.updateMessage);
   const markMessagesRead = useDmStore((state) => state.markMessagesRead);
   const addMessage = useDmStore((state) => state.addMessage);
@@ -72,7 +68,6 @@ export default function PrivateChatsPage() {
   const [match, params] = useRoute('/messages/:chatId');
   const [, setLocation] = useLocation();
   const { data: privateChatsData, isLoading: conversationsLoading } = useGetPrivateChats();
-  const queryClient = useQueryClient();
   const currentUsername = user?.username ?? null;
   const currentDisplayName = user?.displayName ?? user?.username ?? '';
 
@@ -92,23 +87,12 @@ export default function PrivateChatsPage() {
     if (messageIds.length === 0) return;
 
     markMessagesRead(chatId, messageIds);
-    clearUnread(chatId);
 
     if (currentUsername) {
       const socket = socketService.getSocket();
-      const token = getSessionToken();
-      messageIds.forEach((messageId) => {
-        socket?.emit('mark_as_read', { room: chatId, messageId });
-        void fetch(apiUrl(`/messages/${encodeURIComponent(messageId)}/read`), {
-          method: 'PUT',
-          headers: {
-            'x-username': currentUsername,
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        }).catch(() => {});
-      });
+      messageIds.forEach((messageId) => socket?.emit('mark_as_read', { room: chatId, messageId }));
     }
-  }, [clearUnread, currentUsername, markMessagesRead]);
+  }, [currentUsername, user?.id, markMessagesRead]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -130,7 +114,7 @@ export default function PrivateChatsPage() {
         displayName,
         username,
         profilePicture: other.profilePicture ?? null,
-        lastMessage: username,
+        lastMessage: "",
         time: "",
         lastSeen: other.lastSeen ?? null,
         hideLastSeen: Boolean((other as { hideLastSeen?: boolean; hide_last_seen?: boolean }).hideLastSeen ?? (other as { hideLastSeen?: boolean; hide_last_seen?: boolean }).hide_last_seen),
@@ -140,65 +124,13 @@ export default function PrivateChatsPage() {
       } as PrivateConversation;
     });
     setConversations(normalizedChats);
-    normalizedChats.forEach((chat, index) => {
-      const serverUnreadCount = privateChatsData.chats[index]?.unreadCount;
-      if (typeof serverUnreadCount === 'number') setUnreadCount(chat.id, serverUnreadCount);
-    });
 
     if (params?.chatId && params.chatId !== selectedConversationId) {
       setSelectedConversationId(params.chatId);
     } else if (!params?.chatId && !selectedConversationId && normalizedChats.length > 0) {
       setSelectedConversationId(normalizedChats[0].id);
     }
-  }, [privateChatsData, params?.chatId, selectedConversationId, setUnreadCount]);
-
-  useEffect(() => {
-    const socket = socketService.connect();
-    const onUserProfileUpdated = (profile: { id?: string; username?: string; displayName?: string; profilePicture?: string | null; profile_picture?: string | null; avatarUrl?: string | null; avatar_url?: string | null }) => {
-      if (!profile?.id && !profile?.username) return;
-      const hasProfilePicture = Object.prototype.hasOwnProperty.call(profile, 'profilePicture')
-        || Object.prototype.hasOwnProperty.call(profile, 'profile_picture')
-        || Object.prototype.hasOwnProperty.call(profile, 'avatarUrl')
-        || Object.prototype.hasOwnProperty.call(profile, 'avatar_url');
-      const nextProfilePicture = profile.profilePicture ?? profile.profile_picture ?? profile.avatarUrl ?? profile.avatar_url ?? null;
-      setConversations((previous) => previous.map((conversation) => (
-        conversation.otherUserId === profile.id || conversation.username === profile.username
-          ? {
-              ...conversation,
-              displayName: profile.displayName ?? conversation.displayName,
-              username: profile.username ?? conversation.username,
-              profilePicture: hasProfilePicture ? nextProfilePicture : conversation.profilePicture,
-            }
-          : conversation
-      )));
-
-      queryClient.setQueryData<DmsResponse>(getGetPrivateChatsQueryKey(), (current: DmsResponse | undefined) => {
-        if (!current?.chats) return current;
-        return {
-          ...current,
-          chats: current.chats.map((chat: DmsResponse["chats"][number]) => (
-            chat.otherUser.id === profile.id || chat.otherUser.username === profile.username
-              ? {
-                  ...chat,
-                  otherUser: {
-                    ...chat.otherUser,
-                    displayName: profile.displayName ?? chat.otherUser.displayName,
-                    username: profile.username ?? chat.otherUser.username,
-                    ...(hasProfilePicture ? { profilePicture: nextProfilePicture } : {}),
-                  },
-                }
-              : chat
-          )),
-        };
-      });
-      void queryClient.invalidateQueries({ queryKey: getGetPrivateChatsQueryKey() });
-    };
-
-    socket.on('user_profile_updated', onUserProfileUpdated);
-    return () => {
-      socket.off('user_profile_updated', onUserProfileUpdated);
-    };
-  }, [queryClient]);
+  }, [privateChatsData, params?.chatId, selectedConversationId]);
 
   useEffect(() => {
     if (!selectedConversationId || !currentUsername) return;
@@ -575,27 +507,6 @@ export default function PrivateChatsPage() {
   }, [selectedConversationId, refreshMessagesForChat]);
 
   const selectedConversation = conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
-  const displayConversations = useMemo(() => conversations.map((conversation) => {
-    const chatMessages = dmMessages
-      .filter((message) => message.chatId === conversation.id)
-      .sort((left, right) => left.seq != null && right.seq != null
-        ? left.seq - right.seq
-        : left.timestamp.localeCompare(right.timestamp));
-    const latestMessage = chatMessages.at(-1) ?? null;
-    const loadedUnreadCount = chatMessages.filter((message) =>
-      message.senderId !== user?.id
-      && message.senderUsername !== currentUsername
-      && message.status !== 'read'
-      && !message.unsent,
-    ).length;
-    return {
-      ...conversation,
-      lastMessage: getMessagePreview(latestMessage, conversation.username),
-      unreadCount: chatMessages.length > 0
-        ? loadedUnreadCount
-        : unreadCounts[conversation.id] ?? conversation.unreadCount,
-    };
-  }), [conversations, currentUsername, dmMessages, unreadCounts, user?.id]);
   const activeMessages = useMemo(() => (selectedConversation ? dmMessages.filter((message) => message.chatId === selectedConversation.id) : []), [dmMessages, selectedConversation]);
 
   useEffect(() => {
@@ -623,7 +534,7 @@ export default function PrivateChatsPage() {
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <section className={`${isMobile && showRoom ? "hidden" : "block"} w-full border-b border-gray-200 bg-white/90 dark:border-gray-800 dark:bg-gray-900/90 lg:block lg:w-80 lg:border-b-0 lg:border-r`}>
             <PrivateChatList
-              conversations={displayConversations}
+              conversations={conversations}
               conversationsLoading={conversationsLoading}
               onSelectConversation={handleSelectConversation}
               onStartChat={handleStartChat}
