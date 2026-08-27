@@ -15,6 +15,7 @@ import { updateLastSeen } from "@/hooks/useSupabaseRealtime";
 import { normalizeDmMessage, useDmStore } from "@/store/dmStore";
 import type { DmMessage } from "@/store/dmStore";
 import { apiUrl } from "@/lib/api-url";
+import { loadQueuedMessages, queueMessage, removeQueuedMessage, type QueuedMessage } from "@/lib/message-outbox";
 
 type PrivateConversation = {
   id: string;
@@ -65,13 +66,78 @@ export default function PrivateChatsPage() {
   const [socketState, setSocketState] = useState(() => socketService.getState());
   const [isRouteLoaded, setIsRouteLoaded] = useState(false);
   const previousChatIdRef = useRef<string | null>(null);
+  const outboxRetryRef = useRef(false);
   const [match, params] = useRoute('/messages/:chatId');
   const [, setLocation] = useLocation();
   const { data: privateChatsData, isLoading: conversationsLoading } = useGetPrivateChats();
   const currentUsername = user?.username ?? null;
   const currentDisplayName = user?.displayName ?? user?.username ?? '';
 
+  const flushOutbox = useCallback(async (chatId: string, socket: NonNullable<ReturnType<typeof socketService.getSocket>>) => {
+    if (!user?.id || !socket.connected) return;
+
+    const queuedMessages = loadQueuedMessages(user.id).filter((message) => message.chatId === chatId);
+    for (const message of queuedMessages) {
+      await new Promise<void>((resolve) => {
+        const timeout = window.setTimeout(resolve, 5000);
+        socket.emit('send_message', { room: chatId, content: message.content, clientMessageId: message.id }, (response: any) => {
+          window.clearTimeout(timeout);
+          if (response?.ok) {
+            const sentMessage = response.message ?? {};
+            updateMessage(message.id, {
+              ...normalizeDmMessage(sentMessage, chatId),
+              status: 'sent',
+              _pendingKey: message.id,
+            });
+            removeQueuedMessage(user.id, message.id);
+          }
+          resolve();
+        });
+      });
+    }
+  }, [updateMessage, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !selectedConversationId) return;
+    loadQueuedMessages(user.id)
+      .filter((message) => message.chatId === selectedConversationId)
+      .forEach((message) => addMessage({ ...message, status: 'sending', _pendingKey: message.id }));
+  }, [addMessage, selectedConversationId, user?.id]);
+
   useEffect(() => socketService.onStateChange(setSocketState), []);
+
+  useEffect(() => {
+    if (!user?.id || !selectedConversationId) return;
+
+    let cancelled = false;
+    const retryQueuedMessages = async () => {
+      if (cancelled || outboxRetryRef.current || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+      outboxRetryRef.current = true;
+      try {
+        const socket = await socketService.ensureAuthenticated();
+        if (!socket || cancelled) return;
+        const joined = socketService.getState().room === selectedConversationId
+          && socketService.getRoomStatus() === 'JOINED'
+          ? true
+          : await socketService.joinRoom(selectedConversationId);
+        if (joined && !cancelled) await flushOutbox(selectedConversationId, socket);
+      } finally {
+        outboxRetryRef.current = false;
+      }
+    };
+
+    const unsubscribe = socketService.onStateChange((state) => {
+      if (state.authState === 'SUCCESS' || state.roomState === 'JOINED') void retryQueuedMessages();
+    });
+    window.addEventListener('online', retryQueuedMessages);
+    void retryQueuedMessages();
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      window.removeEventListener('online', retryQueuedMessages);
+    };
+  }, [flushOutbox, selectedConversationId, user?.id]);
 
   useEffect(() => {
     setIsJoined(socketState.roomState === 'JOINED' && socketState.room === selectedConversationId);
@@ -197,13 +263,14 @@ export default function PrivateChatsPage() {
       setChatStatus((previous) => ({ ...previous, authentication: 'authenticated' }));
       socket = authenticatedSocket;
 
-      const doJoin = (socketToUse: NonNullable<typeof socket>) => {
+      const doJoin = async (socketToUse: NonNullable<typeof socket>) => {
         if (cancelled || !selectedConversationId) return;
-        void socketService.joinRoom(selectedConversationId);
+        const joined = await socketService.joinRoom(selectedConversationId);
+        if (joined) await flushOutbox(selectedConversationId, socketToUse);
         previousChatIdRef.current = selectedConversationId;
       };
 
-      doJoin(authenticatedSocket);
+      void doJoin(authenticatedSocket);
       reconnectHandler = () => {
         if (cancelled) return;
         void (async () => {
@@ -229,7 +296,7 @@ export default function PrivateChatsPage() {
           } catch {
             // The regular chat refresh below remains the fallback sync path.
           }
-          doJoin(reconnectedSocket);
+          await doJoin(reconnectedSocket);
           await refreshMessagesForChat(selectedConversationId);
         })();
       };
@@ -262,7 +329,7 @@ export default function PrivateChatsPage() {
       setIsJoined(false);
       previousChatIdRef.current = null;
     };
-  }, [joinAttempt, mergeMessages, selectedConversationId, toast, updateMessage, user?.id]);
+  }, [flushOutbox, joinAttempt, mergeMessages, selectedConversationId, toast, updateMessage, user?.id]);
 
   const handleSelectConversation = (conversationId: string) => {
     const exists = conversations.some((conversation) => conversation.id === conversationId);
@@ -344,28 +411,21 @@ export default function PrivateChatsPage() {
 
   const handleSendMessage = async (content: string, replyTo?: string | null) => {
     if (!selectedConversationId) return false;
-    if (!isJoined) {
-      toast({ title: 'Chat is connecting', description: 'Please wait until the chat is joined.' });
-      return false;
-    }
-    setChatStatus((previous) => ({ ...previous, message: 'pending' }));
     if (!currentUsername) {
       toast({ title: 'Unable to send message', description: 'You are not authenticated.' });
       return false;
     }
 
-    const socket = await socketService.ensureAuthenticated();
-    if (!socket) {
-      setChatStatus((previous) => ({ ...previous, message: 'failed' }));
-      toast({ title: 'Unable to send message', description: 'Socket authentication failed. Please sign in again.' });
-      return false;
-    }
-
-    if (user?.id) {
-      await updateLastSeen(user.id, new Date());
-    }
-
     const pendingKey = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `local-${Date.now()}`;
+    const queuedMessage: QueuedMessage = {
+      id: pendingKey,
+      chatId: selectedConversationId,
+      content,
+      senderId: user?.id ?? '',
+      senderUsername: currentUsername,
+      senderName: currentDisplayName,
+      timestamp: new Date().toISOString(),
+    };
     const optimisticMessage: DmMessage = {
       id: pendingKey,
       _pendingKey: pendingKey,
@@ -379,8 +439,21 @@ export default function PrivateChatsPage() {
     };
 
     addMessage(optimisticMessage);
+    if (user?.id) queueMessage(user.id, queuedMessage);
     setConversations((prev) => prev.map((conversation) => (conversation.id === selectedConversationId ? { ...conversation, lastMessage: content, time: "Now" } : conversation)));
 
+    const socket = socketService.getSocket();
+    if (!isJoined || !socket?.connected) {
+      setChatStatus((previous) => ({ ...previous, message: 'pending' }));
+      setConnectionBanner('You are offline. This message will send when you reconnect.');
+      return true;
+    }
+
+    if (user?.id) {
+      await updateLastSeen(user.id, new Date());
+    }
+
+    setChatStatus((previous) => ({ ...previous, message: 'pending' }));
     socket.emit('send_message', { room: selectedConversationId, content, clientMessageId: pendingKey }, (resp: any) => {
       if (!resp) return;
       if (resp.ok) {
@@ -390,11 +463,12 @@ export default function PrivateChatsPage() {
           status: 'sent',
           _pendingKey: pendingKey,
         });
+        if (user?.id) removeQueuedMessage(user.id, pendingKey);
         setChatStatus((previous) => ({
           ...previous,
           message: 'sent',
         }));
-      } else {
+      } else if (!['ROOM_NOT_JOINED', 'AUTH_REQUIRED', 'NOT_AUTHENTICATED'].includes(resp.code)) {
         updateMessage(pendingKey, { status: 'failed' });
         setChatStatus((previous) => ({ ...previous, message: 'failed' }));
         toast({ title: 'Message failed', description: resp.message ?? resp.code ?? 'Unable to send message' });

@@ -120,7 +120,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export interface RegisterResponse {
   message: string;
   userId: string;
-  verificationLink?: string;
 }
 
 export function resolveAvatarUrl(value: string | null | undefined): string | null {
@@ -140,6 +139,22 @@ export function resolveAvatarUrl(value: string | null | undefined): string | nul
 export const authApi = {
   register: (data: { email: string; username: string; displayName: string; password: string; confirmPassword: string }) =>
     request<RegisterResponse>("/auth/register", { method: "POST", body: JSON.stringify(data) }),
+
+  uploadVoiceNote: async (audio: Blob, mimeType: string) => {
+    const { uploadURL, objectPath } = await request<{ uploadURL: string; objectPath: string }>("/storage/uploads/request-url", {
+      method: "POST",
+      body: JSON.stringify({ name: `voice-note.${mimeType.split("/")[1] ?? "webm"}`, size: audio.size }),
+    });
+
+    const uploadResponse = await fetch(uploadURL, {
+      method: "PUT",
+      headers: { "Content-Type": mimeType },
+      body: audio,
+    });
+    if (!uploadResponse.ok) throw new AuthRequestError("Unable to upload voice note.", uploadResponse.status);
+
+    return { audioUrl: uploadURL, objectPath };
+  },
 
   login: async (data: { identifier: string; password: string }) => {
     clearSessionState();

@@ -55,8 +55,6 @@ export default function Register() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
-  const [resendStatus, setResendStatus] = useState<string | null>(null);
 
   const inputStyle = (focused: boolean) => ({
     border: `1px solid ${focused ? `${ACCENT}60` : "rgba(255,255,255,0.08)"}`,
@@ -67,33 +65,28 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setUnverifiedEmail(null);
-    setResendStatus(null);
     if (!email || !username || !password || !confirmPassword) { setError("Please fill out every field."); return; }
     if (password !== confirmPassword) { setError("Passwords don’t match. Try again."); return; }
     if (password.length < 8) { setError("Use a password with at least 8 characters."); return; }
     setLoading(true);
     try {
       const normalizedEmail = email.trim();
-      const result = await authApi.register({
+      await authApi.register({
         email: normalizedEmail,
         username: username.trim(),
         displayName: displayName.trim() || username.trim(),
         password,
         confirmPassword,
       });
-      setUser(result.user);
-      setCurrentUsername(result.user.username);
-      localStorage.setItem("uchat_username", result.user.username);
+      const loginResult = await authApi.login({ identifier: normalizedEmail, password });
+      setUser(loginResult.user);
+      setCurrentUsername(loginResult.user.username);
+      localStorage.setItem("uchat_username", loginResult.user.username);
       await socketService.ensureAuthenticated();
       setLocation("/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Registration failed";
       setError(message);
-      const payload = err instanceof Error ? (err as any).payload : undefined;
-      if (payload?.error?.code === 'UNVERIFIED_ACCOUNT') {
-        setUnverifiedEmail(email.trim());
-      }
     } finally {
       setLoading(false);
     }
@@ -166,33 +159,6 @@ export default function Register() {
           </div>
 
           {error && <p className="text-[12px] text-center" style={{ color: "#EF4444" }}>{error}</p>}
-
-          {unverifiedEmail && (
-            <div className="text-center mt-3">
-              <button
-                type="button"
-                onClick={async () => {
-                  setLoading(true);
-                  setResendStatus(null);
-                  setError("");
-                  try {
-                    await authApi.resendVerification(unverifiedEmail);
-                    setResendStatus('Verification email resent. Please check your inbox.');
-                  } catch (err: unknown) {
-                    const message = err instanceof Error ? err.message : 'Unable to resend verification email';
-                    setError(message);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className="text-sm underline"
-                style={{ color: ACCENT }}
-              >
-                Resend verification email
-              </button>
-              {resendStatus && <p className="text-[12px] mt-2" style={{ color: '#A78BFA' }}>{resendStatus}</p>}
-            </div>
-          )}
 
           <button
             type="submit" disabled={loading}

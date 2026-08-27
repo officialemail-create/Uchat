@@ -89,6 +89,8 @@ export type DmsResponse = {
 import React from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiUrl } from '@/lib/api-url'
+import { getSessionToken } from '@/lib/auth'
+import { useAuthStore } from '@/store/authStore'
 
 const buildHeaders = (token?: string | null) => ({
   'Content-Type': 'application/json',
@@ -96,11 +98,12 @@ const buildHeaders = (token?: string | null) => ({
 })
 
 const requestJson = async <T,>(path: string, options?: RequestInit): Promise<T> => {
-  const token = typeof window !== 'undefined'
-    ? await (await import('@/lib/supabase')).getSupabaseAuthToken()
-    : null;
+  const token = getSessionToken();
   const currentUsername = typeof window !== 'undefined'
-    ? localStorage.getItem('uchat_username') ?? sessionStorage.getItem('uchat_username') ?? ''
+    ? localStorage.getItem('uchat_username')
+      ?? sessionStorage.getItem('uchat_username')
+      ?? useAuthStore.getState().user?.username
+      ?? ''
     : '';
   const headers = {
     ...buildHeaders(token),
