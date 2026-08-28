@@ -4,7 +4,7 @@
   "installCommand": "npm ci",
   "framework": "vite",
   "rewrites": [
-    { "source": "/((?!assets/|favicon.svg|logo.ico|manifest.json|sw.js).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|favicon.svg|logo.ico|manifest.json).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
