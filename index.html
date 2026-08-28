@@ -17,6 +17,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      if ('serviceWorker' in navigator) {
+        const hadController = Boolean(navigator.serviceWorker.controller);
+        Promise.all([
+          navigator.serviceWorker.getRegistrations().then((registrations) =>
+            Promise.all(registrations.map((registration) => registration.unregister()))
+          ),
+          'caches' in window ? caches.keys().then((cacheNames) =>
+            Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)))
+          ) : Promise.resolve()
+        ]).then(() => {
+          if (hadController) window.location.reload();
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root">
@@ -31,20 +46,5 @@
       .preact-splash img { width: clamp(96px, 22vw, 128px); height: clamp(96px, 22vw, 128px); object-fit: contain; border-radius: 22%; }
     </style>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          const hadController = Boolean(navigator.serviceWorker.controller);
-          if (hadController) {
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-              window.location.reload();
-            }, { once: true });
-          }
-          navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(error => {
-            console.error('ServiceWorker registration failed:', error);
-          });
-        });
-      }
-    </script>
   </body>
 </html>

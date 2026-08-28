@@ -1,4 +1,4 @@
-const CACHE_NAME = 'uchat-v3';
+const CACHE_NAME = 'uchat-v2';
 const ASSETS_TO_CACHE = [
   '/index.html',
   '/manifest.json',
