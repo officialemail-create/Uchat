@@ -92,6 +92,9 @@ function AppContent() {
   useSupabaseRealtime();
 
   const { user } = useAuthStore();
+  const routerBase = import.meta.env.BASE_URL === '/'
+    ? undefined
+    : import.meta.env.BASE_URL.replace(/\/$/, '');
 
   useEffect(() => {
     if (!user) return;
@@ -160,7 +163,7 @@ function AppContent() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <ErrorBoundary>
-            <WouterRouter>
+            <WouterRouter base={routerBase}>
               <Router />
             </WouterRouter>
           </ErrorBoundary>
