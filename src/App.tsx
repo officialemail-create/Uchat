@@ -122,8 +122,9 @@ function AppContent() {
       return;
     }
 
+    let authTimeout: number | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      window.setTimeout(() => reject(new Error('Authentication request timed out')), 10000);
+      authTimeout = window.setTimeout(() => reject(new Error('Authentication request timed out')), 5000);
     });
 
     Promise.race([authApi.me(), timeout])
@@ -135,6 +136,9 @@ function AppContent() {
       .catch(() => {
         clearSessionState();
         setUser(null);
+      })
+      .finally(() => {
+        if (authTimeout !== undefined) window.clearTimeout(authTimeout);
         setLoading(false);
       });
   }, []);
