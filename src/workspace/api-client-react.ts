@@ -122,11 +122,17 @@ const requestJson = async <T,>(path: string, options?: RequestInit): Promise<T> 
   return json as T
 }
 
-export const useGetMessages = (_opts?: any) =>
-  React.useMemo(() => ({ data: { messages: [] as Message[], hasMore: false }, isLoading: false }), [])
+export const useGetMessages = (opts?: { limit?: number }) =>
+  useQuery({
+    queryKey: ['messages', opts?.limit ?? 100],
+    queryFn: () => requestJson<{ messages: Message[]; hasMore: boolean }>(`/messages?limit=${opts?.limit ?? 100}`),
+  })
 
-export const useGetMessageStats = (_opts?: any) =>
-  React.useMemo(() => ({ data: { onlineCount: 0, totalMessages: 0, activeRooms: 0 } as MessageStats, isLoading: false }), [])
+export const useGetMessageStats = () =>
+  useQuery({
+    queryKey: ['messages', 'stats'],
+    queryFn: () => requestJson<MessageStats>('/messages/stats'),
+  })
 
 export const useCreateRoom = () => {
   return useMutation({

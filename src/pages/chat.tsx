@@ -184,22 +184,23 @@ export default function Chat() {
 
     requestNotificationPermission();
     const socket = socketService.connect();
-    const doJoin = () => { void socketService.joinRoom("global"); };
+    const joinAndDrainQueue = async () => {
+      const joined = await socketService.joinRoom("global");
+      if (!joined || !user?.id) return;
+      await drainQueuedMessages(user.id, (queued) => new Promise<boolean>((resolve) => {
+        socket.emit("send_message", { room: "global", content: queued.content, clientMessageId: queued.id }, (response: { ok?: boolean; message?: Message }) => {
+          if (!response?.ok || !response.message) { resolve(false); return; }
+          useChatStore.getState().replacePendingMessage(`pending-${queued.id}`, response.message);
+          resolve(true);
+        });
+      }));
+    };
 
-    socket.on("connect", () => {
+    socket.on("connect", async () => {
       setIsConnected(true);
-      doJoin();
-      if (user?.id) {
-        void drainQueuedMessages(user.id, (queued) => new Promise<boolean>((resolve) => {
-          socket.emit("send_message", { room: "global", content: queued.content, clientMessageId: queued.id }, (response: { ok?: boolean; message?: Message }) => {
-            if (!response?.ok || !response.message) { resolve(false); return; }
-            useChatStore.getState().replacePendingMessage(`pending-${queued.id}`, response.message);
-            resolve(true);
-          });
-        }));
-      }
+      await joinAndDrainQueue();
     });
-    socket.on("disconnect", () => { setIsConnected(false); clearPendingMessages(); });
+    socket.on("disconnect", () => { setIsConnected(false); });
 
     socket.on("join_error", ({ error }: { error: string }) => {
       sessionStorage.setItem("uchat_join_error", error);
@@ -215,6 +216,14 @@ export default function Chat() {
         const state = useChatStore.getState();
         if (state.pendingIds.has(pendingId)) {
           state.replacePendingMessage(pendingId, msg);
+          return;
+        }
+      }
+      const clientMessageId = (msg as Message & { clientMessageId?: string }).clientMessageId;
+      if (clientMessageId) {
+        const pendingId = `pending-${clientMessageId}`;
+        if (useChatStore.getState().pendingIds.has(pendingId)) {
+          useChatStore.getState().replacePendingMessage(pendingId, msg);
           return;
         }
       }
@@ -245,7 +254,7 @@ export default function Chat() {
     socket.on("online_count", (count: number) => setOnlineCount(count));
     socket.on("room_typing_update", (payload: { roomId: string | null; users: string[] }) => setTypingUsers(payload?.users ?? []));
 
-    if (socket.connected) doJoin();
+    if (socket.connected) void joinAndDrainQueue();
 
     return () => {
       ["connect","disconnect","join_error","message_received","new_message","message_edited","message_unsent",
@@ -257,7 +266,10 @@ export default function Chat() {
 
   useEffect(() => {
     if (initialMessages?.messages) {
-      setMessages([...initialMessages.messages].reverse());
+      const state = useChatStore.getState();
+      const pendingMessages = state.messages.filter((message) => state.pendingIds.has(message.id));
+      const historyMessages = [...initialMessages.messages].reverse();
+      setMessages([...historyMessages, ...pendingMessages.filter((pending) => !historyMessages.some((message) => message.id === pending.id))]);
       setHasMore((initialMessages as { messages: Message[]; hasMore?: boolean }).hasMore ?? false);
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 80);
       const initReactions = new Map<string, Reaction[]>();
