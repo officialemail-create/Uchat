@@ -3,26 +3,30 @@ import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 import { getSessionToken } from '@/lib/auth';
 import { normalizeDmMessage, useDmStore } from '@/store/dmStore';
+import { apiUrl } from '@/lib/api-url';
 
 export async function updateLastSeen(userId: string | null | undefined, timestamp = new Date()) {
-  if (!userId || !supabase) return null;
+  if (!userId) return null;
 
   const iso = timestamp.toISOString();
-  console.log(`Updating last_seen to ${iso}`);
-
-  const { data, error } = await supabase
-    .from('users')
-    .update({ last_seen: iso, updated_at: iso })
-    .eq('id', userId)
-    .select('id, last_seen')
-    .maybeSingle();
-
-  if (error) {
-    console.error('Failed to update last_seen', error);
+  try {
+    const token = getSessionToken();
+    const username = typeof window !== 'undefined' ? localStorage.getItem('uchat_username') : null;
+    const response = await fetch(apiUrl('/auth/last-seen'), {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(username ? { 'x-username': username } : {}),
+      },
+      body: JSON.stringify({ timestamp: iso }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as { lastSeen?: string | null };
+    return data.lastSeen ?? iso;
+  } catch {
     return null;
   }
-
-  return data?.last_seen ?? iso;
 }
 
 export function useSupabaseRealtime() {

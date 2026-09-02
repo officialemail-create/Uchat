@@ -1,4 +1,4 @@
-import { apiUrl } from './api-url';
+import { apiUrl, storageUrl } from './api-url';
 
 export interface AuthUser {
   id: string;
@@ -129,9 +129,9 @@ export function resolveAvatarUrl(value: string | null | undefined): string | nul
   if (normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('data:')) {
     return normalized;
   }
-  if (normalized.startsWith('/api/')) return normalized;
-  if (normalized.startsWith('/uploads/')) return `/api/storage${normalized}`;
-  if (normalized.startsWith('uploads/')) return `/api/storage/${normalized}`;
+  if (normalized.startsWith('/api/')) return `${apiUrl('').replace(/\/api$/, '')}${normalized}`;
+  if (normalized.startsWith('/uploads/')) return storageUrl(normalized);
+  if (normalized.startsWith('uploads/')) return storageUrl(normalized);
   if (normalized.startsWith('/')) return normalized;
   return normalized;
 }
@@ -148,7 +148,11 @@ export const authApi = {
 
     const uploadResponse = await fetch(uploadURL, {
       method: "PUT",
-      headers: { "Content-Type": mimeType },
+      headers: {
+        "Content-Type": mimeType,
+        ...(getSessionToken() ? { Authorization: `Bearer ${getSessionToken()}` } : {}),
+        ...(typeof window !== "undefined" && localStorage.getItem("uchat_username") ? { "x-username": localStorage.getItem("uchat_username") as string } : {}),
+      },
       body: audio,
     });
     if (!uploadResponse.ok) throw new AuthRequestError("Unable to upload voice note.", uploadResponse.status);

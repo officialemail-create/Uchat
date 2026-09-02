@@ -8,6 +8,7 @@ import {
   Play,
 } from "lucide-react";
 import ImageLightbox from "./image-lightbox";
+import { storageUrl } from "@/lib/api-url";
 
 export interface AttachmentItem {
   objectPath: string;
@@ -28,7 +29,7 @@ function formatSize(bytes: number): string {
 }
 
 function servingUrl(objectPath: string): string {
-  return `/api/storage${objectPath}`;
+  return storageUrl(objectPath);
 }
 
 function getFileIcon(mimeType: string) {

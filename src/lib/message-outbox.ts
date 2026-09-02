@@ -37,3 +37,12 @@ export function queueMessage(userId: string, message: QueuedMessage) {
 export function removeQueuedMessage(userId: string, messageId: string) {
   saveQueuedMessages(userId, loadQueuedMessages(userId).filter((message) => message.id !== messageId));
 }
+
+export async function drainQueuedMessages(
+  userId: string,
+  send: (message: QueuedMessage) => Promise<boolean>,
+) {
+  for (const message of loadQueuedMessages(userId)) {
+    if (await send(message)) removeQueuedMessage(userId, message.id);
+  }
+}

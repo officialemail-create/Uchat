@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { apiUrl } from "@/lib/api-url";
+import { apiUrl, storageUrl } from "@/lib/api-url";
 import type { RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -38,7 +38,7 @@ import { useSettingsStore, ACCENT_PRESETS, type FontSize } from "@/store/setting
 import { useChatStore } from "@/store/chatStore";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { authApi, resolveAvatarUrl } from "@/lib/auth";
+import { authApi, getSessionToken, resolveAvatarUrl } from "@/lib/auth";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useAuthStore } from "@/store/authStore";
 
@@ -170,20 +170,30 @@ function SettingsAccountCard({ onClose, sectionRef }: { onClose: () => void; sec
     setUploading(true);
     setUploadError(null);
     try {
+      const token = getSessionToken();
+      const username = localStorage.getItem("uchat_username");
       const res = await fetch(apiUrl("/storage/uploads/request-url"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(username ? { "x-username": username } : {}),
+        },
         body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
       });
       if (!res.ok) throw new Error("Failed to get upload URL");
       const { uploadURL, objectPath } = await res.json() as { uploadURL: string; objectPath: string };
       const putRes = await fetch(uploadURL, {
         method: "PUT",
-        headers: { "Content-Type": file.type },
+        headers: {
+          "Content-Type": file.type,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(username ? { "x-username": username } : {}),
+        },
         body: file,
       });
       if (!putRes.ok) throw new Error("Upload failed");
-      const servingUrl = `/api/storage${objectPath}`;
+      const servingUrl = storageUrl(objectPath);
       
       // Update profile via API to sync across all users
       const profileRes = await authApi.updateProfile({ profilePicture: servingUrl });

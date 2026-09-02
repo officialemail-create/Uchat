@@ -13,6 +13,7 @@ import { useFileUpload } from "@/hooks/use-file-upload";
 import { insertEmojiAtCursor } from "@/lib/emoji-utils";
 import { useToast } from "@/hooks/use-toast";
 import { authApi } from "@/lib/auth";
+import { queueMessage } from "@/lib/message-outbox";
 
 interface ChatInputProps {
   replyingTo: Message | null;
@@ -123,12 +124,13 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
   const handleSend = () => {
     const socket = socketService.getSocket();
     const currentUserId = useAuthStore.getState().user?.id;
-    if (!socket || !currentUsername || !currentUserId) return;
+    if (!currentUsername || !currentUserId) return;
     if (hasUploading) return;
 
     if (editingMessage) {
       const clean = text.trim();
       if (!clean) return;
+      if (!socket?.connected) return;
       updateMessage(editingMessage.id, clean);
       socket.emit("edit_message", { messageId: editingMessage.id, newMessage: clean });
       onCancelEdit(); setText(""); emitTyping(false);
@@ -154,6 +156,18 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
       replyToSender: replyingTo?.senderName ?? null,
         attachments: readyAttachments.length > 0 ? readyAttachments : undefined,
     });
+
+    if (!socket?.connected) {
+      if (readyAttachments.length > 0) {
+        toast({ title: "Attachment waiting", description: "Attachments require an internet connection." });
+        useChatStore.getState().deleteMessage(pendingId);
+        return;
+      }
+      queueMessage(currentUserId, { id: pendingKey, chatId: "global", content: clean, senderId: currentUserId, senderUsername: currentUsername, senderName: currentUsername, timestamp: new Date().toISOString() });
+      setText("");
+      onCancelReply();
+      return;
+    }
 
     socket.emit("send_message", {
       room: "global",

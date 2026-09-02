@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { format, isSameDay, isToday, isYesterday } from "date-fns";
 import { requestNotificationPermission, showNotification, playNotificationSound } from "@/lib/notify";
 import { apiUrl } from "@/lib/api-url";
+import { drainQueuedMessages, loadQueuedMessages } from "@/lib/message-outbox";
 
 const BG = "#0B0F19";
 const ACCENT = "#8B5CF6";
@@ -175,11 +176,29 @@ export default function Chat() {
     setCurrentUsername(savedUsername);
     currentUsernameRef.current = savedUsername;
 
+    if (user?.id) {
+      for (const queued of loadQueuedMessages(user.id).filter((message) => message.chatId === "global")) {
+        addPendingMessage({ id: `pending-${queued.id}`, senderName: queued.senderName, message: queued.content, timestamp: queued.timestamp });
+      }
+    }
+
     requestNotificationPermission();
     const socket = socketService.connect();
-    const doJoin = () => socket.emit("join", { username: savedUsername });
+    const doJoin = () => { void socketService.joinRoom("global"); };
 
-    socket.on("connect", () => { setIsConnected(true); doJoin(); });
+    socket.on("connect", () => {
+      setIsConnected(true);
+      doJoin();
+      if (user?.id) {
+        void drainQueuedMessages(user.id, (queued) => new Promise<boolean>((resolve) => {
+          socket.emit("send_message", { room: "global", content: queued.content, clientMessageId: queued.id }, (response: { ok?: boolean; message?: Message }) => {
+            if (!response?.ok || !response.message) { resolve(false); return; }
+            useChatStore.getState().replacePendingMessage(`pending-${queued.id}`, response.message);
+            resolve(true);
+          });
+        }));
+      }
+    });
     socket.on("disconnect", () => { setIsConnected(false); clearPendingMessages(); });
 
     socket.on("join_error", ({ error }: { error: string }) => {

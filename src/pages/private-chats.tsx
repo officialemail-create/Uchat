@@ -15,6 +15,7 @@ import { updateLastSeen } from "@/hooks/useSupabaseRealtime";
 import { normalizeDmMessage, useDmStore } from "@/store/dmStore";
 import type { DmMessage } from "@/store/dmStore";
 import { apiUrl } from "@/lib/api-url";
+import { drainQueuedMessages, loadQueuedMessages, queueMessage } from "@/lib/message-outbox";
 
 type PrivateConversation = {
   id: string;
@@ -53,6 +54,22 @@ export default function PrivateChatsPage() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    for (const queued of loadQueuedMessages(user.id)) {
+      addMessage(normalizeDmMessage({
+        id: queued.id,
+        chatId: queued.chatId,
+        senderId: queued.senderId,
+        senderUsername: queued.senderUsername,
+        senderName: queued.senderName,
+        content: queued.content,
+        timestamp: queued.timestamp,
+        status: 'sending',
+      }, queued.chatId));
+    }
+  }, [addMessage, user?.id]);
   const [connectionBanner, setConnectionBanner] = useState<string | null>(null);
   const [isJoined, setIsJoined] = useState(false);
   const [joinAttempt, setJoinAttempt] = useState(0);
@@ -210,6 +227,19 @@ export default function PrivateChatsPage() {
           const reconnectedSocket = await socketService.ensureAuthenticated();
           if (!reconnectedSocket || cancelled) return;
           socket = reconnectedSocket;
+          if (user?.id) {
+            await drainQueuedMessages(user.id, (queued) => new Promise<boolean>((resolve) => {
+              reconnectedSocket.emit('join_room', { room: queued.chatId }, (joinResponse: { ok?: boolean }) => {
+                if (joinResponse?.ok === false) { resolve(false); return; }
+                reconnectedSocket.emit('send_message', { room: queued.chatId, content: queued.content, clientMessageId: queued.id }, (response: { ok?: boolean; message?: Record<string, unknown> }) => {
+                  if (response?.ok && response.message) {
+                    updateMessage(queued.id, { ...normalizeDmMessage(response.message, queued.chatId), status: 'sent', _pendingKey: queued.id });
+                    resolve(true);
+                  } else resolve(false);
+                });
+              });
+            }));
+          }
           const token = getSessionToken();
           const lastMessage = dmMessages
             .filter((message) => message.chatId === selectedConversationId)
@@ -344,25 +374,10 @@ export default function PrivateChatsPage() {
 
   const handleSendMessage = async (content: string, replyTo?: string | null) => {
     if (!selectedConversationId) return false;
-    if (!isJoined) {
-      toast({ title: 'Chat is connecting', description: 'Please wait until the chat is joined.' });
-      return false;
-    }
     setChatStatus((previous) => ({ ...previous, message: 'pending' }));
     if (!currentUsername) {
       toast({ title: 'Unable to send message', description: 'You are not authenticated.' });
       return false;
-    }
-
-    const socket = await socketService.ensureAuthenticated();
-    if (!socket) {
-      setChatStatus((previous) => ({ ...previous, message: 'failed' }));
-      toast({ title: 'Unable to send message', description: 'Socket authentication failed. Please sign in again.' });
-      return false;
-    }
-
-    if (user?.id) {
-      await updateLastSeen(user.id, new Date());
     }
 
     const pendingKey = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `local-${Date.now()}`;
@@ -379,6 +394,20 @@ export default function PrivateChatsPage() {
     };
 
     addMessage(optimisticMessage);
+    if (!isJoined) {
+      if (user?.id) queueMessage(user.id, { id: pendingKey, chatId: selectedConversationId, content, senderId: user.id, senderUsername: currentUsername, senderName: currentDisplayName, timestamp: optimisticMessage.timestamp });
+      setChatStatus((previous) => ({ ...previous, message: 'pending' }));
+      return true;
+    }
+
+    const socket = await socketService.ensureAuthenticated();
+    if (!socket) {
+      if (user?.id) queueMessage(user.id, { id: pendingKey, chatId: selectedConversationId, content, senderId: user.id, senderUsername: currentUsername, senderName: currentDisplayName, timestamp: optimisticMessage.timestamp });
+      return true;
+    }
+
+    if (user?.id) await updateLastSeen(user.id, new Date());
+
     setConversations((prev) => prev.map((conversation) => (conversation.id === selectedConversationId ? { ...conversation, lastMessage: content, time: "Now" } : conversation)));
 
     socket.emit('send_message', { room: selectedConversationId, content, clientMessageId: pendingKey }, (resp: any) => {

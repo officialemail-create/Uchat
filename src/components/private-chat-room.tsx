@@ -618,7 +618,7 @@ export function PrivateChatRoom({ conversation, messages, messagesLoading = fals
             onVoiceSend={handleVoiceSend}
            isEditing={Boolean(editingMessageId)}
            onCancelEdit={() => { setEditingMessageId(null); setDraft(""); }}
-           disabled={!isJoined}
+           disabled={false}
           />
         </Suspense>
       </div>

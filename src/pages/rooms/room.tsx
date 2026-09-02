@@ -14,6 +14,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetRoomsQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { storageUrl } from "@/lib/api-url";
 import {
   ArrowLeft,
   Camera,
@@ -181,7 +182,7 @@ const MessageBubble = memo(function MessageBubble({ message, isMine, currentUser
                 if (mime.startsWith("image/")) {
                   return (
                     <div key={attachment.objectPath} className="overflow-hidden rounded-xl border border-border bg-surface">
-                      <img src={`/api/storage/${attachment.objectPath}`} alt={attachment.fileName} className="max-h-64 w-full object-cover" />
+                      <img src={storageUrl(attachment.objectPath)} alt={attachment.fileName} className="max-h-64 w-full object-cover" />
                     </div>
                   );
                 }
@@ -189,7 +190,7 @@ const MessageBubble = memo(function MessageBubble({ message, isMine, currentUser
                 if (mime.startsWith("video/")) {
                   return (
                     <div key={attachment.objectPath} className="overflow-hidden rounded-xl border border-border bg-surface">
-                      <video src={`/api/storage/${attachment.objectPath}`} controls className="max-h-64 w-full" />
+                      <video src={storageUrl(attachment.objectPath)} controls className="max-h-64 w-full" />
                     </div>
                   );
                 }
@@ -603,7 +604,7 @@ export default function RoomPage() {
       }
       if (!uploadRes.ok) throw new Error((uploadData.error as string) ?? "Upload failed");
       const upload = (uploadData.file as { url?: string; storedName?: string; fileName?: string; mimeType?: string } | undefined) ?? {};
-      body.content = upload.url ?? `/api/storage/uploads/${upload.storedName ?? payload.file.name}`;
+      body.content = upload.url ?? storageUrl(`uploads/${upload.storedName ?? payload.file.name}`);
       body.mimeType = upload.mimeType ?? (payload.file.type || "application/octet-stream");
       body.fileName = upload.fileName ?? payload.file.name;
     }
@@ -991,9 +992,9 @@ export default function RoomPage() {
                     roomFiles.filter((attachment) => (attachment.mimeType || "").startsWith("image/") || (attachment.mimeType || "").startsWith("video/")).map((attachment) => (
                       <div key={attachment.objectPath} className="overflow-hidden rounded-2xl border border-border bg-background/80">
                         {attachment.mimeType?.startsWith("video/") ? (
-                          <video src={`/api/storage/${attachment.objectPath}`} controls className="h-32 w-full object-cover" />
+                          <video src={storageUrl(attachment.objectPath)} controls className="h-32 w-full object-cover" />
                         ) : (
-                          <img src={`/api/storage/${attachment.objectPath}`} alt={attachment.fileName} className="h-32 w-full object-cover" />
+                          <img src={storageUrl(attachment.objectPath)} alt={attachment.fileName} className="h-32 w-full object-cover" />
                         )}
                       </div>
                     ))
