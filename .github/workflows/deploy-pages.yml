@@ -26,14 +26,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: Uchat/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: Uchat
         run: npm ci
 
       - name: Build
-        working-directory: Uchat
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -42,7 +40,6 @@ jobs:
           VITE_SOCKET_URL: ${{ secrets.VITE_SOCKET_URL || 'https://backend-1rl6.onrender.com' }}
 
       - name: Enable SPA routes
-        working-directory: Uchat
         run: cp dist/index.html dist/404.html
 
       - name: Configure Pages
@@ -51,7 +48,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Uchat/dist
+          path: dist
 
   deploy:
     needs: build
