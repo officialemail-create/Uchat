@@ -143,7 +143,7 @@ export const authApi = {
   uploadVoiceNote: async (audio: Blob, mimeType: string) => {
     const { uploadURL, objectPath } = await request<{ uploadURL: string; objectPath: string }>("/storage/uploads/request-url", {
       method: "POST",
-      body: JSON.stringify({ name: `voice-note.${mimeType.split("/")[1] ?? "webm"}`, size: audio.size }),
+      body: JSON.stringify({ name: `voice-note.${mimeType.split("/")[1] ?? "webm"}`, size: audio.size, contentType: mimeType }),
     });
 
     const uploadResponse = await fetch(uploadURL, {
