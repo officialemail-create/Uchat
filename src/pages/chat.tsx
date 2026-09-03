@@ -230,7 +230,7 @@ export default function Chat() {
       addMessage(msg);
       if (msg.senderName !== currentUsernameRef.current && !msg.unsent) {
         playNotificationSound();
-        showNotification(msg.senderName, msg.voiceNote ? "Voice note" : msg.message);
+        showNotification(msg.senderName, msg.voiceNote ? "Voice note" : msg.message, `${import.meta.env.BASE_URL}`);
       }
       if (isScrolledNearBottom.current) {
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));

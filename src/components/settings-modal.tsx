@@ -37,6 +37,7 @@ import {
 import { useSettingsStore, ACCENT_PRESETS, type FontSize } from "@/store/settingsStore";
 import { useChatStore } from "@/store/chatStore";
 import { useToast } from "@/hooks/use-toast";
+import { disablePushNotifications, enablePushNotifications } from "@/lib/push-notifications";
 import { useLocation } from "wouter";
 import { authApi, getSessionToken, resolveAvatarUrl } from "@/lib/auth";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -411,18 +412,33 @@ function PrivacySettings() {
 }
 
 function SettingsNotificationsCard() {
-  const { update } = useSettingsStore();
+  const { soundEnabled, desktopNotifications, update } = useSettingsStore();
   const [notifications, setNotifications] = useState({
     muteAll: false,
-    messageSounds: true,
-    desktopNotifications: true,
+    messageSounds: soundEnabled,
+    desktopNotifications,
     vibration: true,
     showLockPreview: false,
   });
   const [muteDuration, setMuteDuration] = useState("1h");
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const apply = (key: keyof typeof notifications, value: boolean) => {
     setNotifications((current) => ({ ...current, [key]: value }));
+    if (key === "messageSounds") update({ soundEnabled: value });
+    if (key === "desktopNotifications") {
+      update({ desktopNotifications: value });
+      setPushBusy(true);
+      void (value ? enablePushNotifications() : disablePushNotifications()).then((success) => {
+        setPushStatus(success ? (value ? "Push notifications enabled" : "Push notifications disabled") : "Push notifications are unavailable in this browser or backend.");
+        if (!success) toast({ title: "Notifications unavailable", description: "Check browser permission and backend push configuration.", variant: "destructive" });
+      }).catch(() => {
+        setPushStatus("Push notification setup failed");
+        toast({ title: "Notifications unavailable", description: "Unable to register this device.", variant: "destructive" });
+      }).finally(() => setPushBusy(false));
+    }
   };
 
   return (
@@ -445,7 +461,7 @@ function SettingsNotificationsCard() {
             </div>
           </div>
           <ToggleControl label="Message Sounds" description="Play a tone on incoming messages." checked={notifications.messageSounds} onChange={(next) => apply("messageSounds", next)} ariaLabel="Toggle message sounds" />
-          <ToggleControl label="Desktop Notifications" description="Display browser notifications while away." checked={notifications.desktopNotifications} onChange={(next) => apply("desktopNotifications", next)} ariaLabel="Toggle desktop notifications" />
+          <ToggleControl label="Desktop Notifications" description={pushBusy ? "Updating this device..." : pushStatus ?? "Display alerts while you are away."} checked={notifications.desktopNotifications} onChange={(next) => apply("desktopNotifications", next)} ariaLabel="Toggle desktop notifications" />
           <ToggleControl label="Vibration" description="Use vibration feedback on mobile." checked={notifications.vibration} onChange={(next) => apply("vibration", next)} ariaLabel="Toggle vibration" />
           <ToggleControl label="Show Preview in Lock Screen" description="Show alert previews even when locked." checked={notifications.showLockPreview} onChange={(next) => apply("showLockPreview", next)} ariaLabel="Toggle preview in lock screen" />
         </div>

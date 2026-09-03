@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MoreHorizontal, CornerUpLeft } from "lucide-react";
+import { MoreHorizontal, CornerUpLeft, Clock3 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useChatStore, type Reaction } from "@/store/chatStore";
@@ -429,7 +429,9 @@ const ChatMessage = memo(function ChatMessage({
                             <span className="font-mono text-xs italic" style={{ color: "rgba(255,255,255,0.28)" }}>edited</span>
                           )}
                           <span className="font-mono text-xs tabular-nums" style={{ color: "rgba(255,255,255,0.35)" }}>{time}</span>
-                          {isOwn && <span className="font-mono text-xs" style={{ color: tickColor }}>✓</span>}
+                          {isOwn && (isPending
+                            ? <Clock3 className="h-3 w-3" style={{ color: tickColor }} />
+                            : <span className="font-mono text-xs" style={{ color: tickColor }}>✓</span>)}
                         </div>
                       )}
                       <AnimatePresence>

@@ -137,6 +137,22 @@ export function resolveAvatarUrl(value: string | null | undefined): string | nul
 }
 
 export const authApi = {
+  uploadFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    const token = getSessionToken();
+    const username = typeof window !== 'undefined' ? localStorage.getItem('uchat_username') : null;
+    const response = await fetch(apiUrl('/uploads'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(username ? { 'x-username': username } : {}) },
+      body: formData,
+    });
+    const body = await response.json() as { file?: { objectPath?: string; url?: string; fileName?: string; size?: number; mimeType?: string }; error?: string };
+    if (!response.ok || !body.file) throw new AuthRequestError(body.error ?? 'Unable to upload file.', response.status);
+    return body.file;
+  },
+
   register: (data: { email: string; username: string; displayName: string; password: string; confirmPassword: string }) =>
     request<RegisterResponse>("/auth/register", { method: "POST", body: JSON.stringify(data) }),
 

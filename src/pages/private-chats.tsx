@@ -16,6 +16,7 @@ import { normalizeDmMessage, useDmStore } from "@/store/dmStore";
 import type { DmMessage } from "@/store/dmStore";
 import { apiUrl } from "@/lib/api-url";
 import { drainQueuedMessages, loadQueuedMessages, queueMessage } from "@/lib/message-outbox";
+import { playNotificationSound, requestNotificationPermission, showNotification } from "@/lib/notify";
 
 type PrivateConversation = {
   id: string;
@@ -202,6 +203,18 @@ export default function PrivateChatsPage() {
         setConversations((previous) => previous.map((conversation) => conversation.otherUserId === userId ? { ...conversation, online: false, showOnlineStatus: false } : conversation));
     };
 
+    const onPrivateMessage = (rawMessage: Record<string, unknown>) => {
+      const messageChatId = typeof rawMessage.chatId === 'string'
+        ? rawMessage.chatId
+        : typeof rawMessage.room === 'string' ? rawMessage.room : '';
+      if (messageChatId !== currentChatId) return;
+      const normalized = normalizeDmMessage(rawMessage, currentChatId);
+      if (normalized.senderId === user?.id || normalized.senderUsername === currentUsername) return;
+      mergeMessages([normalized]);
+      playNotificationSound();
+      showNotification(normalized.senderName || normalized.senderUsername || 'New message', normalized.content || 'New message', `/Uchat/messages/${currentChatId}`);
+    };
+
     const joinChat = async () => {
       setIsJoined(false);
       setChatStatus((previous) => ({ ...previous, authentication: 'connecting', join: 'joining', receiver: 'unknown' }));
@@ -267,6 +280,9 @@ export default function PrivateChatsPage() {
       socket.on('user_online', onUserOnline);
       socket.on('user_offline', onUserOffline);
       socket.on('presence_hidden', onPresenceHidden);
+      requestNotificationPermission();
+      socket.on('message_received', onPrivateMessage);
+      socket.on('new_message', onPrivateMessage);
 
       socket.on('connect', reconnectHandler);
       socket.on('reconnect', reconnectHandler);
@@ -285,6 +301,8 @@ export default function PrivateChatsPage() {
       socket?.off('user_online', onUserOnline);
       socket?.off('user_offline', onUserOffline);
       socket?.off('presence_hidden', onPresenceHidden);
+      socket?.off('message_received', onPrivateMessage);
+      socket?.off('new_message', onPrivateMessage);
       socket?.off('disconnect', disconnectHandler);
       if (currentChatId) {
         socketService.leaveRoom(currentChatId);
@@ -372,7 +390,7 @@ export default function PrivateChatsPage() {
     toast({ title: "Friend added", description: `You can chat with ${user.displayName} now.` });
   };
 
-  const handleSendMessage = async (content: string, replyTo?: string | null) => {
+  const handleSendMessage = async (content: string, replyTo?: string | null, attachments?: DmMessage['attachments']) => {
     if (!selectedConversationId) return false;
     setChatStatus((previous) => ({ ...previous, message: 'pending' }));
     if (!currentUsername) {
@@ -389,6 +407,7 @@ export default function PrivateChatsPage() {
       senderUsername: currentUsername,
       senderName: currentDisplayName,
       content,
+      attachments,
       timestamp: new Date().toISOString(),
       status: "sending",
     };
@@ -410,7 +429,7 @@ export default function PrivateChatsPage() {
 
     setConversations((prev) => prev.map((conversation) => (conversation.id === selectedConversationId ? { ...conversation, lastMessage: content, time: "Now" } : conversation)));
 
-    socket.emit('send_message', { room: selectedConversationId, content, clientMessageId: pendingKey }, (resp: any) => {
+    socket.emit('send_message', { room: selectedConversationId, content, attachments, clientMessageId: pendingKey }, (resp: any) => {
       if (!resp) return;
       if (resp.ok) {
         const sentMessage = resp.message ?? {};

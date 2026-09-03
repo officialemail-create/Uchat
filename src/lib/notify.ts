@@ -6,7 +6,7 @@ export function requestNotificationPermission(): void {
   }
 }
 
-export function showNotification(senderName: string, message: string): void {
+export function showNotification(senderName: string, message: string, url = `${import.meta.env.BASE_URL}`): void {
   const { desktopNotifications, notificationPreviews } = useSettingsStore.getState();
   if (!desktopNotifications) return;
   if (document.hasFocus()) return;
@@ -16,15 +16,12 @@ export function showNotification(senderName: string, message: string): void {
     ? message.length > 100 ? message.slice(0, 100) + "…" : message
     : "New message";
 
-  try {
-    new Notification(senderName, {
-      body,
-      icon: "/favicon.ico",
-      tag: "uchat-chat",
-    });
-  } catch {
-    /* ignore */
-  }
+  const options = { body, icon: `${import.meta.env.BASE_URL}favicon.ico`, tag: "uchat-chat", data: { url } };
+  void navigator.serviceWorker?.ready.then((registration) => {
+    void registration.showNotification(senderName, options);
+  }).catch(() => {
+    try { new Notification(senderName, options); } catch { /* ignore */ }
+  });
 }
 
 export function playNotificationSound(): void {

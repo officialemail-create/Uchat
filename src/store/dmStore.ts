@@ -20,6 +20,7 @@ export type DmMessage = {
   voiceDuration?: number | null;
   voiceMimeType?: string;
   voiceSize?: number;
+  attachments?: Array<{ objectPath: string; fileName: string; fileSize: number; mimeType: string }>;
   _pendingKey?: string;
 };
 
@@ -42,12 +43,13 @@ export function normalizeDmMessage(message: Partial<DmMessage> & Record<string, 
     unsent: message.unsent,
     starred: message.starred,
     reactions,
-    kind: message.kind ?? (message.voiceNote || message.voice_note ? 'voice' : 'text'),
+    kind: message.kind ?? (message.voiceNote || message.voice_note ? 'voice' : message.attachments?.length ? 'image' : 'text'),
     attachmentUrl: message.attachmentUrl ?? message.audioUrl ?? message.audio_url,
     attachmentName: message.attachmentName,
     voiceDuration: message.voiceDuration ?? message.duration ?? null,
     voiceMimeType: message.voiceMimeType ?? message.mimeType,
     voiceSize: message.voiceSize ?? message.size,
+    attachments: message.attachments,
     _pendingKey: message._pendingKey,
   };
 }

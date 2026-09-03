@@ -1,5 +1,5 @@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Check, CheckCheck, Clock3, Lock, MoreVertical, RotateCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, CheckCheck, Clock3, Lock, MoreVertical, RotateCw } from "lucide-react";
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authApi, resolveAvatarUrl } from "@/lib/auth";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -14,6 +14,7 @@ import { socketService } from "@/services/socket";
 import type { DmMessage } from "@/store/dmStore";
 import { SkeletonBubble } from "@/components/skeletons";
 import VoiceMessageBubble from "@/components/voice-message-bubble";
+import { storageUrl } from "@/lib/api-url";
 
 const ChatInput = lazy(() => import("@/components/private-chat-input").then((module) => ({ default: module.ChatInput })));
 
@@ -68,7 +69,7 @@ interface PrivateChatRoomProps {
   messagesLoading?: boolean;
   currentUsername: string;
   onBack: () => void;
-  onSendMessage: (content: string, replyTo?: string | null) => Promise<boolean>;
+  onSendMessage: (content: string, replyTo?: string | null, attachments?: DmMessage['attachments']) => Promise<boolean>;
   onResendMessage: (messageId: string) => Promise<boolean>;
   onDeleteMessage: (messageId: string) => void;
   onEditMessage?: (messageId: string, newContent: string) => void;
@@ -111,13 +112,14 @@ const MessageBubble = memo(function MessageBubble({
   onResend?: (message: PrivateMessageItem) => void;
 }) {
   useReadReceipts(message.id, isVisible && !isMine && message.status !== "sending", onRead);
+  const attachment = message.attachments?.[0];
 
   const statusIcon =
     message.status === "sending" ? <Clock3 className="h-3.5 w-3.5 text-gray-400" /> :
     message.status === "sent" ? <Check className="h-3.5 w-3.5 text-white/80" /> :
     message.status === "delivered" ? <CheckCheck className="h-3.5 w-3.5 text-white/80" /> :
     message.status === "read" ? <CheckCheck className="h-3.5 w-3.5 text-purple-200" /> :
-    <CheckCheck className="h-3.5 w-3.5 text-red-300" />;
+    <AlertCircle className="h-3.5 w-3.5 text-red-300" />;
 
   return (
     <div ref={messageRef} data-message-id={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
@@ -138,10 +140,16 @@ const MessageBubble = memo(function MessageBubble({
         }}
       >
         <div className="p-3">
-          {message.kind === "image" && message.attachmentUrl ? (
+          {attachment && attachment.mimeType.startsWith("image/") ? (
             <div className="overflow-hidden rounded-xl border border-purple-200 dark:border-purple-700">
-              <img src={message.attachmentUrl} alt={message.attachmentName || "Shared image"} loading="lazy" className="max-h-64 w-full object-cover" />
+              <img src={storageUrl(attachment.objectPath)} alt={attachment.fileName} loading="lazy" className="max-h-64 w-full object-cover" />
             </div>
+          ) : null}
+
+          {attachment && !attachment.mimeType.startsWith("image/") ? (
+            <a href={storageUrl(attachment.objectPath)} target="_blank" rel="noreferrer" className="mb-2 block rounded-lg border border-purple-200 px-3 py-2 text-sm underline">
+              {attachment.fileName}
+            </a>
           ) : null}
 
           {message.content && message.kind !== "voice" ? <p className={`break-words text-base leading-relaxed tracking-tight ${isMine ? "text-white" : "text-gray-900 dark:text-gray-100"}`}>{message.content}</p> : null}
@@ -404,7 +412,13 @@ export function PrivateChatRoom({ conversation, messages, messagesLoading = fals
   const handleUpload = async (file: File) => {
     const isImage = file.type.startsWith("image/");
     const content = isImage ? "Shared an image" : `Shared ${file.name}`;
-    await onSendMessage(content);
+    try {
+      const upload = await authApi.uploadFile(file);
+      const objectPath = upload.objectPath ?? (upload.url ?? '').replace(/^.*\/api\/storage\//, '');
+      await onSendMessage(content, null, [{ objectPath, fileName: upload.fileName ?? file.name, fileSize: upload.size ?? file.size, mimeType: upload.mimeType ?? file.type }]);
+    } catch (error) {
+      toast({ title: "Upload failed", description: error instanceof Error ? error.message : "Unable to upload file", variant: "destructive" });
+    }
   };
 
   const handleCameraUpload = async (file: File) => {
