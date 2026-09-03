@@ -194,7 +194,7 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
     const socket = socketService.getSocket();
     if (!socket || !currentUsername) return;
 
-    let uploaded: { audioUrl: string };
+    let uploaded: { audioUrl: string; mimeType: string };
     try {
       uploaded = await authApi.uploadVoiceNote(audioBlob, mimeType);
     } catch (error) {
@@ -222,7 +222,7 @@ export default function ChatInput({ replyingTo, onCancelReply, editingMessage, o
     socket.emit("send_voice_note", {
       room: "global",
       audioUrl: uploaded.audioUrl,
-      mimeType,
+      mimeType: uploaded.mimeType,
       size: audioBlob.size,
       duration: durationMs,
       clientMessageId: pendingKey,

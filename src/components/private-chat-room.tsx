@@ -435,7 +435,7 @@ export function PrivateChatRoom({ conversation, messages, messagesLoading = fals
         room: conversation.id,
         audioUrl: uploaded.audioUrl,
         duration: durationMs,
-        mimeType,
+        mimeType: uploaded.mimeType,
         size: audioBlob.size,
         clientMessageId: crypto.randomUUID(),
       }, (response: { ok?: boolean; reason?: string; code?: string }) => {

@@ -157,15 +157,16 @@ export const authApi = {
     request<RegisterResponse>("/auth/register", { method: "POST", body: JSON.stringify(data) }),
 
   uploadVoiceNote: async (audio: Blob, mimeType: string) => {
+    const normalizedMimeType = mimeType.split(';', 1)[0].trim().toLowerCase() || audio.type.split(';', 1)[0].trim().toLowerCase() || "audio/webm";
     const { uploadURL, objectPath } = await request<{ uploadURL: string; objectPath: string }>("/storage/uploads/request-url", {
       method: "POST",
-      body: JSON.stringify({ name: `voice-note.${mimeType.split("/")[1] ?? "webm"}`, size: audio.size, contentType: mimeType }),
+      body: JSON.stringify({ name: `voice-note.${normalizedMimeType.split("/")[1] ?? "webm"}`, size: audio.size, contentType: normalizedMimeType }),
     });
 
     const uploadResponse = await fetch(uploadURL, {
       method: "PUT",
       headers: {
-        "Content-Type": mimeType,
+        "Content-Type": normalizedMimeType,
         ...(getSessionToken() ? { Authorization: `Bearer ${getSessionToken()}` } : {}),
         ...(typeof window !== "undefined" && localStorage.getItem("uchat_username") ? { "x-username": localStorage.getItem("uchat_username") as string } : {}),
       },
@@ -173,7 +174,7 @@ export const authApi = {
     });
     if (!uploadResponse.ok) throw new AuthRequestError("Unable to upload voice note.", uploadResponse.status);
 
-    return { audioUrl: uploadURL, objectPath };
+    return { audioUrl: uploadURL, objectPath, mimeType: normalizedMimeType };
   },
 
   login: async (data: { identifier: string; password: string }) => {
